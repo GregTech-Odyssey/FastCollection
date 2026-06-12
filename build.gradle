@@ -1,0 +1,32 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.fast.fastcollection'
+version = '1.0'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+
+    implementation 'it.unimi.dsi:fastutil:8.5.16'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+afterEvaluate {
+    tasks.withType(org.gradle.jvm.tasks.Jar).configureEach {
+        destinationDirectory = file('build/libs/')
+        manifest.attributes([
+                'FMLModType': 'GAMELIBRARY'
+        ])
+    }
+}
