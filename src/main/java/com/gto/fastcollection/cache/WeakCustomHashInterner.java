@@ -5,25 +5,24 @@ import it.unimi.dsi.fastutil.HashCommon;
 
 import java.util.Arrays;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Function;
 
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 
-public final class WeakValueCustomCache<K, V> implements ICache {
+public final class WeakCustomHashInterner<T> implements Interner<T>, ICleanableCache {
 
-    private final Hash.Strategy<? super K> strategy;
-    private final Segment<K, V>[] segments;
+    private final Hash.Strategy<? super T> strategy;
+    private final Segment<T>[] segments;
     private final int segmentShift;
     private final int segmentMask;
 
-    public WeakValueCustomCache(Hash.Strategy<? super K> strategy) {
-        this(strategy, Runtime.getRuntime().availableProcessors());
+    public WeakCustomHashInterner(Hash.Strategy<? super T> strategy) {
+        this(Runtime.getRuntime().availableProcessors(), strategy);
     }
 
     @SuppressWarnings("unchecked")
-    public WeakValueCustomCache(Hash.Strategy<? super K> strategy, int concurrencyLevel) {
-        if (concurrencyLevel <= 0) throw new IllegalArgumentException("concurrencyLevel must be positive");
+    public WeakCustomHashInterner(int concurrencyLevel, Hash.Strategy<? super T> strategy) {
         this.strategy = strategy;
+        if (concurrencyLevel <= 0) throw new IllegalArgumentException("concurrencyLevel must be positive");
         int ssize = 1;
         while (ssize < concurrencyLevel) {
             ssize <<= 1;
@@ -37,13 +36,15 @@ public final class WeakValueCustomCache<K, V> implements ICache {
         CacheCleaner.add(this);
     }
 
-    public V getCache(final K k, Function<? super K, ? extends V> createFunction) {
-        int hash = strategy.hashCode(k);
+    @Override
+    public T intern(final T sample) {
+        int hash = strategy.hashCode(sample);
         int mix = hash * -1640531527;
         mix ^= mix >>> 16;
-        return segments[ (mix >>> segmentShift) & segmentMask].getCache(k, hash, mix, createFunction);
+        return segments[(mix >>> segmentShift) & segmentMask].intern(sample, hash, mix);
     }
 
+    @Override
     public void clear() {
         for (var seg : segments) {
             seg.clear();
@@ -57,77 +58,75 @@ public final class WeakValueCustomCache<K, V> implements ICache {
         }
     }
 
-    private final static class Segment<K, V> extends ReentrantLock {
-        private final Hash.Strategy<? super K> strategy;
-        private volatile WeakReferenceValueNode<K, V>[] table;
+    private final static class Segment<T> extends ReentrantLock {
+        private final Hash.Strategy<? super T> strategy;
+        private volatile WeakReferenceNode<T>[] table;
         private volatile int mask;
         private volatile int size;
         private volatile int maxFill;
 
         @SuppressWarnings("unchecked")
-        private Segment(Hash.Strategy<? super K> strategy) {
+        private Segment(Hash.Strategy<? super T> strategy) {
             this.strategy = strategy;
             int n = arraySize(Hash.DEFAULT_INITIAL_SIZE, Hash.DEFAULT_LOAD_FACTOR);
-            this.table = new WeakReferenceValueNode[n];
+            this.table = new WeakReferenceNode[n];
             this.mask = n - 1;
             this.maxFill = (int) (n * Hash.DEFAULT_LOAD_FACTOR);
         }
 
-        private V getCache(final K k, final int hash, int mix, Function<? super K, ? extends V> createFunction) {
+        private T intern(final T k, final int hash, int mix) {
             lock();
             try {
                 final int index = mix & this.mask;
-                final WeakReferenceValueNode<K, V> node = table[index];
-                WeakReferenceValueNode<K, V> prev = null;
-                WeakReferenceValueNode<K, V> e = node;
-                while (e != null) {
-                    if (e.hash == hash && strategy.equals(k, e.key)) {
-                        V v = e.get();
-                        if (v != null) return v;
-                        return insert(index, hash, k, prev, e.next, createFunction);
+                WeakReferenceNode<T> node = table[index];
+                WeakReferenceNode<T> prev = null;
+                WeakReferenceNode<T> curr = node;
+                while (curr != null) {
+                    T key = curr.get();
+                    if (key == null) {
+                        if (prev == null) {
+                            node = curr.next;
+                            table[index] = node;
+                        } else {
+                            prev.next = curr.next;
+                        }
+                        size--;
+                    } else {
+                        if (curr.hash == hash && (key == k || strategy.equals(k, key))) {
+                            return key;
+                        }
+                        prev = curr;
                     }
-                    prev = e;
-                    e = e.next;
+                    curr = curr.next;
                 }
-                V v = insert(index, hash, k, null, node, createFunction);
+                table[index] = new WeakReferenceNode<>(k, hash, node);
                 if (++size > maxFill) {
                     resize();
                 }
-                return v;
+                return k;
             } finally {
                 unlock();
             }
         }
 
-        private V insert(final int index, final int hash, final K k, WeakReferenceValueNode<K, V> prev,
-                         WeakReferenceValueNode<K, V> next, Function<? super K, ? extends V> createFunction) {
-            final var v = createFunction.apply(k);
-            var n = new WeakReferenceValueNode<>(k, v, hash, next);
-            if (prev == null) {
-                table[index] = n;
-            } else {
-                prev.next = n;
-            }
-            return v;
-        }
 
         @SuppressWarnings("unchecked")
         private void resize() {
-            WeakReferenceValueNode<K, V>[] oldTab = table;
+            WeakReferenceNode<T>[] oldTab = table;
             int oldCap = oldTab.length;
             int newCap = oldCap << 1;
-            WeakReferenceValueNode<K, V>[] newTab = new WeakReferenceValueNode[newCap];
+            WeakReferenceNode<T>[] newTab = new WeakReferenceNode[newCap];
             int newMask = newCap - 1;
             for (int i = 0; i < oldCap; ++i) {
-                WeakReferenceValueNode<K, V> e;
+                WeakReferenceNode<T> e;
                 if ((e = oldTab[i]) != null) {
                     oldTab[i] = null;
                     if (e.next == null) {
                         newTab[HashCommon.mix(e.hash) & newMask] = e;
                     } else {
-                        WeakReferenceValueNode<K, V> loHead = null, loTail = null;
-                        WeakReferenceValueNode<K, V> hiHead = null, hiTail = null;
-                        WeakReferenceValueNode<K, V> next;
+                        WeakReferenceNode<T> loHead = null, loTail = null;
+                        WeakReferenceNode<T> hiHead = null, hiTail = null;
+                        WeakReferenceNode<T> next;
                         do {
                             next = e.next;
                             if ((HashCommon.mix(e.hash) & oldCap) == 0) {
@@ -175,8 +174,8 @@ public final class WeakValueCustomCache<K, V> implements ICache {
             lock();
             try {
                 for (int i = 0; i < table.length; i++) {
-                    WeakReferenceValueNode<K, V> prev = null;
-                    WeakReferenceValueNode<K, V> curr = table[i];
+                    WeakReferenceNode<T> prev = null;
+                    WeakReferenceNode<T> curr = table[i];
                     while (curr != null) {
                         if (curr.get() == null) {
                             if (prev == null) {

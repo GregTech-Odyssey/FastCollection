@@ -8,9 +8,9 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.function.Consumer;
 
-public class OpenCacheHashSet<K> extends ObjectOpenHashSet<K> {
+public final class OpenCacheHashSet<K> extends ObjectOpenHashSet<K> {
 
-    protected int[] hash;
+    private int[] hash;
 
     public OpenCacheHashSet(final int expected, final float f) {
         super(expected, f);

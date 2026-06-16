@@ -13,9 +13,9 @@ import java.util.function.ToIntFunction;
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 import static it.unimi.dsi.fastutil.HashCommon.maxFill;
 
-public class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
+public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
 
-    protected int[] hash;
+    private int[] hash;
 
     public O2IOpenCacheHashMap(final int expected, final float f) {
         super(expected, f);

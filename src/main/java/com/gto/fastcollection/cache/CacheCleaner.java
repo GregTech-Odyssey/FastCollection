@@ -10,7 +10,7 @@ public final class CacheCleaner {
     private CacheCleaner() {
     }
 
-    private static final ConcurrentLinkedDeque<WeakReference<ICache>> CACHES = new ConcurrentLinkedDeque<>();
+    private static final ConcurrentLinkedDeque<WeakReference<ICleanableCache>> CACHES = new ConcurrentLinkedDeque<>();
 
     static {
         Executors.newSingleThreadScheduledExecutor(r -> {
@@ -32,7 +32,7 @@ public final class CacheCleaner {
         }, 1, 10, TimeUnit.SECONDS);
     }
 
-    public static void add(ICache cache) {
+    public static void add(ICleanableCache cache) {
         CACHES.add(new WeakReference<>(cache));
     }
 }

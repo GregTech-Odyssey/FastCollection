@@ -1,6 +1,6 @@
 package com.gto.fastcollection.cache;
 
-public interface ICache {
+public interface ICleanableCache {
 
     void clearCache();
 }

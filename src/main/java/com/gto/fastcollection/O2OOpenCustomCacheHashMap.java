@@ -13,9 +13,9 @@ import java.util.function.Consumer;
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 import static it.unimi.dsi.fastutil.HashCommon.maxFill;
 
-public class O2OOpenCustomCacheHashMap<K, V> extends Object2ObjectOpenCustomHashMap<K, V> {
+public final class O2OOpenCustomCacheHashMap<K, V> extends Object2ObjectOpenCustomHashMap<K, V> {
 
-    protected int[] hash;
+    private int[] hash;
 
     public O2OOpenCustomCacheHashMap(final int expected, final float f, final Strategy<? super K> strategy) {
         super(expected, f, strategy);

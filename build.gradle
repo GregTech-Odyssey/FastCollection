@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'com.fast.fastcollection'
-version = '1.1'
+version = '1.2'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
@@ -16,6 +16,12 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter'
 
     implementation 'it.unimi.dsi:fastutil:8.5.16'
+
+     testImplementation 'org.openjdk.jmh:jmh-core:1.37'
+     testAnnotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess:1.37'
+
+     testImplementation 'org.assertj:assertj-core:3.27.7'
+     testImplementation 'org.mockito:mockito-core:5.10.0'
 }
 
 test {
