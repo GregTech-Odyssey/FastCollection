@@ -64,6 +64,7 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
         final K[] key = this.key;
         final int[] value = this.value;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         a:
         for (;;) {
             pos = ((last = pos) + 1) & mask;
@@ -101,6 +102,7 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return -(pos + 1);
         if (hash[pos] == h && k.equals(curr)) return pos;
@@ -154,6 +156,7 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
             K curr;
             final K[] key = this.key;
             final int[] hash = this.hash;
+            final int mask = this.mask;
             if ((curr = key[pos = HashCommon.mix(h) & mask]) != null) {
                 do if (hash[pos] == h && curr.equals(k)) return addToValue(pos, incr);
                 while ((curr = key[pos = (pos + 1) & mask]) != null);
@@ -175,6 +178,7 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defRetValue;
@@ -191,6 +195,7 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defRetValue;
@@ -207,6 +212,7 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
@@ -223,6 +229,7 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defaultValue;
@@ -259,6 +266,7 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
@@ -524,6 +532,7 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
             }
             final K[] key = O2IOpenCacheHashMap.this.key;
             final int[] hash = O2IOpenCacheHashMap.this.hash;
+            final int mask = O2IOpenCacheHashMap.this.mask;
             for (;;) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
@@ -545,6 +554,7 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
             }
             final K[] key = O2IOpenCacheHashMap.this.key;
             final int[] hash = O2IOpenCacheHashMap.this.hash;
+            final int mask = O2IOpenCacheHashMap.this.mask;
             while (c != 0) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
@@ -567,6 +577,7 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
             final K[] key = O2IOpenCacheHashMap.this.key;
             final int[] value = O2IOpenCacheHashMap.this.value;
             final int[] hash = O2IOpenCacheHashMap.this.hash;
+            final int mask = O2IOpenCacheHashMap.this.mask;
             for (;;) {
                 pos = ((last = pos) + 1) & mask;
                 for (;;) {
@@ -800,6 +811,7 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
             if (((k) == null)) return O2IOpenCacheHashMap.this.containsNullKey && ((value[n]) == (v));
             K curr;
             final K[] key = O2IOpenCacheHashMap.this.key;
+            final int mask = O2IOpenCacheHashMap.this.mask;
             int pos;
             if (((curr = key[pos = (HashCommon.mix((k).hashCode())) & mask]) == null)) return false;
             if (((k).equals(curr))) return ((value[pos]) == (v));
@@ -826,6 +838,7 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
             }
             K curr;
             final K[] key = O2IOpenCacheHashMap.this.key;
+            final int mask = O2IOpenCacheHashMap.this.mask;
             int pos;
             if (((curr = key[pos = (HashCommon.mix((k).hashCode())) & mask]) == null)) return false;
             if (((curr).equals(k))) {

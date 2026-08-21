@@ -1,9 +1,12 @@
 plugins {
     id 'java'
+    id 'maven-publish'
+    alias libs.plugins.spotless
+    alias libs.plugins.gtopublishgradleplugin
 }
 
 group = 'com.fast.fastcollection'
-version = '1.2'
+version = '26.8.1'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
@@ -28,6 +31,22 @@ test {
     useJUnitPlatform()
 }
 
+// 正式 JMH 基准入口：尊重 benchmark 类上的 @Fork/@Warmup/@Measurement 注解，
+// 输出可信数据。用法：./gradlew jmh -Pbenchmark="OpenCacheHashSetBenchmark"
+// （-Pbenchmark 可选，默认跑全部 4 个 benchmark 类；smoke 测试仍是快速 CI 校验）。
+tasks.register('jmh', JavaExec) {
+    group = 'benchmark'
+    description = 'Runs the JMH benchmarks with their configured forks/iterations'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gto.fastcollection.cache.BenchmarkRunner'
+    args = [providers.gradleProperty('benchmark').orElse('.*').get()]
+    // 正式基准较慢，单独运行；不挂到 check/test 上
+}
+
+java {
+    withSourcesJar()
+}
+
 afterEvaluate {
     tasks.withType(org.gradle.jvm.tasks.Jar).configureEach {
         destinationDirectory = file('build/libs/')
@@ -35,4 +54,35 @@ afterEvaluate {
                 'FMLModType': 'GAMELIBRARY'
         ])
     }
+}
+
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            groupId = group
+            artifactId = project.name
+        }
+    }
+    repositories {
+        maven {
+            name = 'gtodysseyRepository'
+            url = 'https://maven.gtodyssey.com/releases'
+            credentials {
+                username = findProperty('gtodysseyRepositoryUsername') ?: ''
+                password = findProperty('gtodysseyRepositoryPassword') ?: ''
+            }
+        }
+    }
+}
+gtoPublish {
+    publishMaven      = true        // 默认 true
+    publishGithub     = false       // 默认 false
+    publishCurseforge = false       // 默认 false
+    mavenRepoName     = 'gtodysseyRepository'  // 默认值
+    mavenRepoUrl      = 'releases'  // 必填，可选值: 'releases' 或 'private'
+    githubRepo        = 'owner/repo-name'      // GitHub 仓库（启用 GitHub 发布时必填）
+    curseforgeProjectId   = '123456'    // CurseForge 项目 ID（启用 CurseForge 时必填）
+    curseforgeJavaVersion = 'Java 17'
 }

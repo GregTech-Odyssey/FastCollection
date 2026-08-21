@@ -90,11 +90,11 @@ public final class OpenCacheHashSet<K> extends ObjectOpenHashSet<K> {
             K curr;
             final K[] key = this.key;
             final int[] hash = this.hash;
-            int pos, ch;
+            int pos;
             if ((curr = key[pos = HashCommon.mix(h) & mask]) != null) {
-                ch = hash[pos];
-                do if (ch == h && curr.equals(k)) return false;
-                while ((curr = key[pos = (pos + 1) & mask]) != null);
+                do {
+                    if (hash[pos] == h && curr.equals(k)) return false;
+                } while ((curr = key[pos = (pos + 1) & mask]) != null);
             }
             key[pos] = k;
             hash[pos] = h;
@@ -113,11 +113,11 @@ public final class OpenCacheHashSet<K> extends ObjectOpenHashSet<K> {
             K curr;
             final K[] key = this.key;
             final int[] hash = this.hash;
-            int pos, ch;
+            int pos;
             if ((curr = key[pos = HashCommon.mix(h) & mask]) != null) {
-                ch = hash[pos];
-                do if (ch == h && curr.equals(k)) return curr;
-                while ((curr = key[pos = (pos + 1) & mask]) != null);
+                do {
+                    if ( hash[pos] == h && curr.equals(k)) return curr;
+                } while ((curr = key[pos = (pos + 1) & mask]) != null);
             }
             key[pos] = k;
             hash[pos] = h;

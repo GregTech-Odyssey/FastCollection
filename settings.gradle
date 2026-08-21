@@ -1,1 +1,23 @@
-rootProject.name = 'fastcollection'
+pluginManagement {
+    repositories {
+        mavenLocal()
+        gradlePluginPortal()
+        maven { url = 'https://maven.gtodyssey.com/releases' }
+    }
+}
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.10.0'
+}
+dependencyResolutionManagement {
+    versionCatalogs {
+        libs {
+            version("gtopublishgradleplugin", "1.0.25")
+            version("spotless", "8.4.0")
+
+            plugin("gtopublishgradleplugin", "com.gto.gtopublishgradleplugin").versionRef("gtopublishgradleplugin")
+            plugin("spotless", "com.diffplug.spotless").versionRef("spotless")
+        }
+    }
+}
+
+rootProject.name = 'FastCollection'

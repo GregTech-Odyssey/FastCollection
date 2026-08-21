@@ -65,6 +65,7 @@ public final class O2OOpenCustomCacheHashMap<K, V> extends Object2ObjectOpenCust
         final K[] key = this.key;
         final V[] value = this.value;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         a:
         for (;;) {
             pos = ((last = pos) + 1) & mask;
@@ -103,6 +104,7 @@ public final class O2OOpenCustomCacheHashMap<K, V> extends Object2ObjectOpenCust
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return -(pos + 1);
         if (hash[pos] == h && strategy.equals(k, curr)) return pos;
@@ -149,6 +151,7 @@ public final class O2OOpenCustomCacheHashMap<K, V> extends Object2ObjectOpenCust
         K fk = (K) k;
         final K[] key = this.key;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defRetValue;
@@ -166,6 +169,7 @@ public final class O2OOpenCustomCacheHashMap<K, V> extends Object2ObjectOpenCust
         K fk = (K) k;
         final K[] key = this.key;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defRetValue;
@@ -183,6 +187,7 @@ public final class O2OOpenCustomCacheHashMap<K, V> extends Object2ObjectOpenCust
         K fk = (K) k;
         final K[] key = this.key;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
@@ -200,6 +205,7 @@ public final class O2OOpenCustomCacheHashMap<K, V> extends Object2ObjectOpenCust
         K fk = (K) k;
         final K[] key = this.key;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defaultValue;
@@ -237,6 +243,7 @@ public final class O2OOpenCustomCacheHashMap<K, V> extends Object2ObjectOpenCust
         K fk = (K) k;
         final K[] key = this.key;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
@@ -459,6 +466,7 @@ public final class O2OOpenCustomCacheHashMap<K, V> extends Object2ObjectOpenCust
             }
             final K[] key = O2OOpenCustomCacheHashMap.this.key;
             final int[] hash = O2OOpenCustomCacheHashMap.this.hash;
+            final int mask = O2OOpenCustomCacheHashMap.this.mask;
             for (;;) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
@@ -502,6 +510,7 @@ public final class O2OOpenCustomCacheHashMap<K, V> extends Object2ObjectOpenCust
             final K[] key = O2OOpenCustomCacheHashMap.this.key;
             final V[] value = O2OOpenCustomCacheHashMap.this.value;
             final int[] hash = O2OOpenCustomCacheHashMap.this.hash;
+            final int mask = O2OOpenCustomCacheHashMap.this.mask;
             for (;;) {
                 pos = ((last = pos) + 1) & mask;
                 for (;;) {
@@ -736,6 +745,7 @@ public final class O2OOpenCustomCacheHashMap<K, V> extends Object2ObjectOpenCust
             if (((k) == null)) return O2OOpenCustomCacheHashMap.this.containsNullKey && Objects.equals(value[n], v);
             K curr;
             final K[] key = O2OOpenCustomCacheHashMap.this.key;
+            final int mask = O2OOpenCustomCacheHashMap.this.mask;
             int pos;
             if (((curr = key[pos = (HashCommon.mix(strategy.hashCode(k))) & mask]) == null)) return false;
             if ((strategy.equals(curr, k))) return Objects.equals(value[pos], v);
@@ -761,6 +771,7 @@ public final class O2OOpenCustomCacheHashMap<K, V> extends Object2ObjectOpenCust
             }
             K curr;
             final K[] key = O2OOpenCustomCacheHashMap.this.key;
+            final int mask = O2OOpenCustomCacheHashMap.this.mask;
             int pos;
             if (((curr = key[pos = (HashCommon.mix(strategy.hashCode(k))) & mask]) == null)) return false;
             if (strategy.equals(k, curr)) {

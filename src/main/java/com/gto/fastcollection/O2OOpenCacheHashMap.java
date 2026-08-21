@@ -62,6 +62,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         final K[] key = this.key;
         final V[] value = this.value;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         a:
         for (;;) {
             pos = ((last = pos) + 1) & mask;
@@ -100,6 +101,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return -(pos + 1);
         if (hash[pos] == h && k.equals(curr)) return pos;
@@ -144,6 +146,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defRetValue;
@@ -160,6 +163,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defRetValue;
@@ -176,6 +180,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
@@ -192,6 +197,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defaultValue;
@@ -228,6 +234,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
+        final int mask = this.mask;
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
@@ -450,6 +457,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
             }
             final K[] key = O2OOpenCacheHashMap.this.key;
             final int[] hash = O2OOpenCacheHashMap.this.hash;
+            final int mask = O2OOpenCacheHashMap.this.mask;
             for (;;) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
@@ -493,6 +501,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
             final K[] key = O2OOpenCacheHashMap.this.key;
             final V[] value = O2OOpenCacheHashMap.this.value;
             final int[] hash = O2OOpenCacheHashMap.this.hash;
+            final int mask = O2OOpenCacheHashMap.this.mask;
             for (;;) {
                 pos = ((last = pos) + 1) & mask;
                 for (;;) {
@@ -738,6 +747,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
             K curr;
             final K[] key = O2OOpenCacheHashMap.this.key;
             final int[] hash = O2OOpenCacheHashMap.this.hash;
+            final int mask = O2OOpenCacheHashMap.this.mask;
             final int h = k.hashCode();
             int pos;
             if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
@@ -765,6 +775,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
             K curr;
             final K[] key = O2OOpenCacheHashMap.this.key;
             final int[] hash = O2OOpenCacheHashMap.this.hash;
+            final int mask = O2OOpenCacheHashMap.this.mask;
             final int h = k.hashCode();
             int pos;
             if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;

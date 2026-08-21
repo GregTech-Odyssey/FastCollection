@@ -4,10 +4,16 @@ import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 
 import java.util.Arrays;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.StampedLock;
 
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 
+/**
+ * An {@link Interner} with the same segmented, {@link StampedLock}-guarded
+ * design as {@link CustomHashCache}, using a custom {@link Hash.Strategy} for
+ * hashing and equality. Use it when "equal" must be decided by application
+ * logic (e.g. comparing only a subset of fields) rather than by {@code equals}.
+ */
 public final class CustomHashInterner<T> implements Interner<T> {
 
     private final Hash.Strategy<? super T> strategy;
@@ -15,10 +21,16 @@ public final class CustomHashInterner<T> implements Interner<T> {
     private final int segmentShift;
     private final int segmentMask;
 
+    /** Creates an interner with default concurrency. */
     public CustomHashInterner(Hash.Strategy<? super T> strategy) {
         this(Runtime.getRuntime().availableProcessors(), strategy);
     }
 
+    /**
+     * Creates an interner with the given concurrency level.
+     *
+     * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
+     */
     @SuppressWarnings("unchecked")
     public CustomHashInterner(int concurrencyLevel, Hash.Strategy<? super T> strategy) {
         this.strategy = strategy;
@@ -35,6 +47,7 @@ public final class CustomHashInterner<T> implements Interner<T> {
         }
     }
 
+    /** {@inheritDoc} */
     @Override
     public T intern(final T sample) {
         int hash = strategy.hashCode(sample);
@@ -43,6 +56,25 @@ public final class CustomHashInterner<T> implements Interner<T> {
         return segments[(mix >>> segmentShift) & segmentMask].intern(sample, hash, mix);
     }
 
+    /** {@inheritDoc} */
+    @Override
+    public boolean isPresent(final T sample) {
+        int hash = strategy.hashCode(sample);
+        int mix = hash * -1640531527;
+        mix ^= mix >>> 16;
+        return segments[(mix >>> segmentShift) & segmentMask].contains(sample, hash, mix);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public boolean addIfAbsent(final T sample) {
+        int hash = strategy.hashCode(sample);
+        int mix = hash * -1640531527;
+        mix ^= mix >>> 16;
+        return segments[(mix >>> segmentShift) & segmentMask].add(sample, hash, mix);
+    }
+
+    /** {@inheritDoc} */
     @Override
     public void clear() {
         for (var seg : segments) {
@@ -50,7 +82,8 @@ public final class CustomHashInterner<T> implements Interner<T> {
         }
     }
 
-    private final static class Segment<T> extends ReentrantLock {
+    /** A striped segment holding canonical instances; see {@link CustomHashCache.Segment}. */
+    private final static class Segment<T> extends StampedLock {
         private final Hash.Strategy<? super T> strategy;
         private volatile Node<T>[] table;
         private volatile int mask;
@@ -66,10 +99,25 @@ public final class CustomHashInterner<T> implements Interner<T> {
             this.maxFill = (int) (n * Hash.DEFAULT_LOAD_FACTOR);
         }
 
+        /** Optimistic lookup; on a miss the canonical instance is stored under the write lock. */
         private T intern(final T k, final int hash, int mix) {
-            lock();
+            long stamp = tryOptimisticRead();
+            if (validate(stamp)) {
+                Node<T> curr = table[mix & mask];
+                while (curr != null) {
+                    var key = curr.key;
+                    if (curr.hash == hash && (key == k || strategy.equals(k, key))) {
+                        if (validate(stamp)) {
+                            return key;
+                        }
+                        break;
+                    }
+                    curr = curr.next;
+                }
+            }
+            stamp = writeLock();
             try {
-                final int index = mix & this.mask;
+                final int index = mix & mask;
                 final Node<T> node = table[index];
                 Node<T> curr = node;
                 while (curr != null) {
@@ -85,11 +133,82 @@ public final class CustomHashInterner<T> implements Interner<T> {
                 }
                 return k;
             } finally {
-                unlock();
+                unlockWrite(stamp);
+            }
+        }
+
+        /** Read-only membership test; never inserts anything. */
+        private boolean contains(final T k, final int hash, int mix) {
+            long stamp = tryOptimisticRead();
+            if (validate(stamp)) {
+                Node<T> curr = table[mix & mask];
+                while (curr != null) {
+                    if (curr.hash == hash && (curr.key == k || strategy.equals(k, curr.key))) {
+                        if (validate(stamp)) {
+                            return true;
+                        }
+                        break;
+                    }
+                    curr = curr.next;
+                }
+                if (validate(stamp)) {
+                    return false;
+                }
+            }
+            stamp = readLock();
+            try {
+                final int index = mix & mask;
+                Node<T> curr = table[index];
+                while (curr != null) {
+                    if (curr.hash == hash && (curr.key == k || strategy.equals(k, curr.key))) {
+                        return true;
+                    }
+                    curr = curr.next;
+                }
+                return false;
+            } finally {
+                unlockRead(stamp);
+            }
+        }
+
+        /** Inserts only if absent, returning whether a new canonical instance was stored. */
+        private boolean add(final T k, final int hash, int mix) {
+            long stamp = tryOptimisticRead();
+            if (validate(stamp)) {
+                Node<T> curr = table[mix & mask];
+                while (curr != null) {
+                    if (curr.hash == hash && (curr.key == k || strategy.equals(k, curr.key))) {
+                        if (validate(stamp)) {
+                            return false;
+                        }
+                        break;
+                    }
+                    curr = curr.next;
+                }
+            }
+            stamp = writeLock();
+            try {
+                final int index = mix & mask;
+                final Node<T> node = table[index];
+                Node<T> curr = node;
+                while (curr != null) {
+                    if (curr.hash == hash && (curr.key == k || strategy.equals(k, curr.key))) {
+                        return false;
+                    }
+                    curr = curr.next;
+                }
+                table[index] = new Node<>(k, hash, node);
+                if (++size > maxFill) {
+                    resize();
+                }
+                return true;
+            } finally {
+                unlockWrite(stamp);
             }
         }
 
 
+        /** Doubles the table and rehashes every chain; called with the write lock held. */
         @SuppressWarnings("unchecked")
         private void resize() {
             Node<T>[] oldTab = table;
@@ -139,18 +258,20 @@ public final class CustomHashInterner<T> implements Interner<T> {
             maxFill = (int) (newCap * Hash.DEFAULT_LOAD_FACTOR);
         }
 
+        /** Empties the table under the write lock. */
         private void clear() {
-            lock();
+            long stamp = writeLock();
             try {
                 if (size == 0) return;
                 size = 0;
                 Arrays.fill(table, null);
             } finally {
-                unlock();
+                unlockWrite(stamp);
             }
         }
     }
 
+    /** A single entry in a chain; immutable except for {@code next}. */
     private static final class Node<T> {
 
         private final T key;
