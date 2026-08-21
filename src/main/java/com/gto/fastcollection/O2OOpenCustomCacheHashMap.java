@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 import static it.unimi.dsi.fastutil.HashCommon.maxFill;
@@ -287,6 +288,21 @@ public final class O2OOpenCustomCacheHashMap<K, V> extends Object2ObjectOpenCust
         final V oldValue = value[pos];
         value[pos] = v;
         return oldValue;
+    }
+
+    @Override
+    public V computeIfAbsent(K k, Function<? super K, ? extends V> mappingFunction) {
+        int pos, h = 0;
+        if (k == null) {
+            pos = containsNullKey ? n : -(n + 1);
+        } else {
+            h = strategy.hashCode(k);
+            pos = find(k, h);
+        }
+        if (pos >= 0) return value[pos];
+        final V newValue = mappingFunction.apply(k);
+        insert(-pos - 1, k, newValue, h);
+        return newValue;
     }
 
     @Override
