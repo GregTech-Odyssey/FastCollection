@@ -4,10 +4,7 @@ import it.unimi.dsi.fastutil.HashCommon;
 import it.unimi.dsi.fastutil.Pair;
 import it.unimi.dsi.fastutil.objects.*;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -105,10 +102,10 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         final int mask = this.mask;
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return -(pos + 1);
-        if (hash[pos] == h && k.equals(curr)) return pos;
+        if (hash[pos] == h && (k == curr || k.equals(curr))) return pos;
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return -(pos + 1);
-            if (hash[pos] == h && k.equals(curr)) return pos;
+            if (hash[pos] == h && (k == curr || k.equals(curr))) return pos;
         }
     }
 
@@ -151,10 +148,10 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defRetValue;
-        if (hash[pos] == h && k.equals(curr)) return removeEntry(pos);
+        if (hash[pos] == h && (k == curr || k.equals(curr))) return removeEntry(pos);
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return defRetValue;
-            if (hash[pos] == h && k.equals(curr)) return removeEntry(pos);
+            if (hash[pos] == h && (k == curr || k.equals(curr))) return removeEntry(pos);
         }
     }
 
@@ -168,10 +165,10 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defRetValue;
-        if (hash[pos] == h && k.equals(curr)) return value[pos];
+        if (hash[pos] == h && (k == curr || k.equals(curr))) return value[pos];
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return defRetValue;
-            if (hash[pos] == h && k.equals(curr)) return value[pos];
+            if (hash[pos] == h && (k == curr || k.equals(curr))) return value[pos];
         }
     }
 
@@ -185,10 +182,10 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
-        if (hash[pos] == h && k.equals(curr)) return true;
+        if (hash[pos] == h && (k == curr || k.equals(curr))) return true;
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return false;
-            if (hash[pos] == h && k.equals(curr)) return true;
+            if (hash[pos] == h && (k == curr || k.equals(curr))) return true;
         }
     }
 
@@ -202,10 +199,10 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defaultValue;
-        if (hash[pos] == h && k.equals(curr)) return value[pos];
+        if (hash[pos] == h && (k == curr || k.equals(curr))) return value[pos];
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return defaultValue;
-            if (hash[pos] == h && k.equals(curr)) return value[pos];
+            if (hash[pos] == h && (k == curr || k.equals(curr))) return value[pos];
         }
     }
 
@@ -239,13 +236,13 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
-        if (hash[pos] == h && k.equals(curr) && Objects.equals(v, value[pos])) {
+        if (hash[pos] == h && (k == curr || k.equals(curr)) && Objects.equals(v, value[pos])) {
             removeEntry(pos);
             return true;
         }
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return false;
-            if (hash[pos] == h && k.equals(curr) && Objects.equals(v, value[pos])) {
+            if (hash[pos] == h && (k == curr || k.equals(curr)) && Objects.equals(v, value[pos])) {
                 removeEntry(pos);
                 return true;
             }

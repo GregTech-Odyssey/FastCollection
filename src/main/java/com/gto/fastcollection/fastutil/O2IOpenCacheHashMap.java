@@ -105,10 +105,10 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
         final int mask = this.mask;
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return -(pos + 1);
-        if (hash[pos] == h && k.equals(curr)) return pos;
+        if (hash[pos] == h && (k == curr || k.equals(curr))) return pos;
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return -(pos + 1);
-            if (hash[pos] == h && k.equals(curr)) return pos;
+            if (hash[pos] == h && (k == curr || k.equals(curr))) return pos;
         }
     }
 
@@ -158,7 +158,7 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
             final int[] hash = this.hash;
             final int mask = this.mask;
             if ((curr = key[pos = HashCommon.mix(h) & mask]) != null) {
-                do if (hash[pos] == h && curr.equals(k)) return addToValue(pos, incr);
+                do if (hash[pos] == h && (curr == k || curr.equals(k))) return addToValue(pos, incr);
                 while ((curr = key[pos = (pos + 1) & mask]) != null);
             }
         }
@@ -182,10 +182,10 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defRetValue;
-        if (hash[pos] == h && k.equals(curr)) return removeEntry(pos);
+        if (hash[pos] == h && (k == curr || k.equals(curr))) return removeEntry(pos);
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return defRetValue;
-            if (hash[pos] == h && k.equals(curr)) return removeEntry(pos);
+            if (hash[pos] == h && (k == curr || k.equals(curr))) return removeEntry(pos);
         }
     }
 
@@ -199,10 +199,10 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defRetValue;
-        if (hash[pos] == h && k.equals(curr)) return value[pos];
+        if (hash[pos] == h && (k == curr || k.equals(curr))) return value[pos];
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return defRetValue;
-            if (hash[pos] == h && k.equals(curr)) return value[pos];
+            if (hash[pos] == h && (k == curr || k.equals(curr))) return value[pos];
         }
     }
 
@@ -216,10 +216,10 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
-        if (hash[pos] == h && k.equals(curr)) return true;
+        if (hash[pos] == h && (k == curr || k.equals(curr))) return true;
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return false;
-            if (hash[pos] == h && k.equals(curr)) return true;
+            if (hash[pos] == h && (k == curr || k.equals(curr))) return true;
         }
     }
 
@@ -233,10 +233,10 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defaultValue;
-        if (hash[pos] == h && k.equals(curr)) return value[pos];
+        if (hash[pos] == h && (k == curr || k.equals(curr))) return value[pos];
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return defaultValue;
-            if (hash[pos] == h && k.equals(curr)) return value[pos];
+            if (hash[pos] == h && (k == curr || k.equals(curr))) return value[pos];
         }
     }
 
@@ -270,13 +270,13 @@ public final class O2IOpenCacheHashMap<K> extends Object2IntOpenHashMap<K> {
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
-        if (hash[pos] == h && k.equals(curr) && v == value[pos]) {
+        if (hash[pos] == h && (k == curr || k.equals(curr)) && v == value[pos]) {
             removeEntry(pos);
             return true;
         }
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return false;
-            if (hash[pos] == h && k.equals(curr) && v == value[pos]) {
+            if (hash[pos] == h && (k == curr || k.equals(curr)) && v == value[pos]) {
                 removeEntry(pos);
                 return true;
             }

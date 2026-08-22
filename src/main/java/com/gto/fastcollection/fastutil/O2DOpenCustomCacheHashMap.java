@@ -104,10 +104,10 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         final int mask = this.mask;
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return -(pos + 1);
-        if (hash[pos] == h && strategy.equals(k, curr)) return pos;
+        if (hash[pos] == h && (k == curr || strategy.equals(k, curr))) return pos;
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return -(pos + 1);
-            if (hash[pos] == h && strategy.equals(k, curr)) return pos;
+            if (hash[pos] == h && (k == curr || strategy.equals(k, curr))) return pos;
         }
     }
 
@@ -157,7 +157,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
             final int[] hash = this.hash;
             final int mask = this.mask;
             if ((curr = key[pos = HashCommon.mix(h) & mask]) != null) {
-                do if (hash[pos] == h && strategy.equals(k, curr)) return addToValue(pos, incr);
+                do if (hash[pos] == h && (k == curr || strategy.equals(k, curr))) return addToValue(pos, incr);
                 while ((curr = key[pos = (pos + 1) & mask]) != null);
             }
         }
@@ -182,10 +182,10 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defRetValue;
-        if (hash[pos] == h && strategy.equals(fk, curr)) return removeEntry(pos);
+        if (hash[pos] == h && (fk == curr || strategy.equals(fk, curr))) return removeEntry(pos);
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return defRetValue;
-            if (hash[pos] == h && strategy.equals(fk, curr)) return removeEntry(pos);
+            if (hash[pos] == h && (fk == curr || strategy.equals(fk, curr))) return removeEntry(pos);
         }
     }
 
@@ -200,10 +200,10 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defRetValue;
-        if (hash[pos] == h && strategy.equals(fk, curr)) return value[pos];
+        if (hash[pos] == h && (fk == curr || strategy.equals(fk, curr))) return value[pos];
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return defRetValue;
-            if (hash[pos] == h && strategy.equals(fk, curr)) return value[pos];
+            if (hash[pos] == h && (fk == curr || strategy.equals(fk, curr))) return value[pos];
         }
     }
 
@@ -218,10 +218,10 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
-        if (hash[pos] == h && strategy.equals(fk, curr)) return true;
+        if (hash[pos] == h && (fk == curr || strategy.equals(fk, curr))) return true;
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return false;
-            if (hash[pos] == h && strategy.equals(fk, curr)) return true;
+            if (hash[pos] == h && (fk == curr || strategy.equals(fk, curr))) return true;
         }
     }
 
@@ -236,10 +236,10 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defaultValue;
-        if (hash[pos] == h && strategy.equals(fk, curr)) return value[pos];
+        if (hash[pos] == h && (fk == curr || strategy.equals(fk, curr))) return value[pos];
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return defaultValue;
-            if (hash[pos] == h && strategy.equals(fk, curr)) return value[pos];
+            if (hash[pos] == h && (fk == curr || strategy.equals(fk, curr))) return value[pos];
         }
     }
 
@@ -274,13 +274,13 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
-        if (hash[pos] == h && strategy.equals(fk, curr) && v == value[pos]) {
+        if (hash[pos] == h && (fk == curr || strategy.equals(fk, curr)) && v == value[pos]) {
             removeEntry(pos);
             return true;
         }
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return false;
-            if (hash[pos] == h && strategy.equals(fk, curr) && v == value[pos]) {
+            if (hash[pos] == h && (fk == curr || strategy.equals(fk, curr)) && v == value[pos]) {
                 removeEntry(pos);
                 return true;
             }

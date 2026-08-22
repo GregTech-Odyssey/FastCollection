@@ -104,10 +104,10 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         final int mask = this.mask;
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return -(pos + 1);
-        if (hash[pos] == h && k.equals(curr)) return pos;
+        if (hash[pos] == h && (k == curr || k.equals(curr))) return pos;
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return -(pos + 1);
-            if (hash[pos] == h && k.equals(curr)) return pos;
+            if (hash[pos] == h && (k == curr || k.equals(curr))) return pos;
         }
     }
 
@@ -152,10 +152,10 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defRetValue;
-        if (hash[pos] == h && k.equals(curr)) return removeEntry(pos);
+        if (hash[pos] == h && (k == curr || k.equals(curr))) return removeEntry(pos);
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return defRetValue;
-            if (hash[pos] == h && k.equals(curr)) return removeEntry(pos);
+            if (hash[pos] == h && (k == curr || k.equals(curr))) return removeEntry(pos);
         }
     }
 
@@ -169,10 +169,10 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defRetValue;
-        if (hash[pos] == h && k.equals(curr)) return value[pos];
+        if (hash[pos] == h && (k == curr || k.equals(curr))) return value[pos];
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return defRetValue;
-            if (hash[pos] == h && k.equals(curr)) return value[pos];
+            if (hash[pos] == h && (k == curr || k.equals(curr))) return value[pos];
         }
     }
 
@@ -186,10 +186,10 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
-        if (hash[pos] == h && k.equals(curr)) return true;
+        if (hash[pos] == h && (k == curr || k.equals(curr))) return true;
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return false;
-            if (hash[pos] == h && k.equals(curr)) return true;
+            if (hash[pos] == h && (k == curr || k.equals(curr))) return true;
         }
     }
 
@@ -203,10 +203,10 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defaultValue;
-        if (hash[pos] == h && k.equals(curr)) return value[pos];
+        if (hash[pos] == h && (k == curr || k.equals(curr))) return value[pos];
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return defaultValue;
-            if (hash[pos] == h && k.equals(curr)) return value[pos];
+            if (hash[pos] == h && (k == curr || k.equals(curr))) return value[pos];
         }
     }
 
@@ -240,13 +240,13 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         final int h = k.hashCode();
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
-        if (hash[pos] == h && k.equals(curr) && v == value[pos]) {
+        if (hash[pos] == h && (k == curr || k.equals(curr)) && v == value[pos]) {
             removeEntry(pos);
             return true;
         }
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return false;
-            if (hash[pos] == h && k.equals(curr) && v == value[pos]) {
+            if (hash[pos] == h && (k == curr || k.equals(curr)) && v == value[pos]) {
                 removeEntry(pos);
                 return true;
             }

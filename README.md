@@ -5,7 +5,7 @@
 核心数据（JMH，详见下文「性能」）：
 
 - **枚举原始 map（`map.enums`）**：命中读比 JDK `EnumMap` 快 21%、比哈希实现快 **3~4 倍**；计数器 `addTo` 每次调用**零分配**、2 倍于装箱写法；每键仅摊销一个数组槽（int 版 4 B），内存下限。
-- **O2X 开放寻址容器（`fastutil`）**：equals 昂贵的键 + 大规模下 `containsKey` / `add` **领先 JDK 40~45%**；原始值版每条目 24 B，比装箱 `HashMap`（44 B）**省 45% 内存**。
+- **O2X 开放寻址容器（`fastutil`）**：探测三层短路（存储哈希 → 引用相等 → `equals`），同实例重复查询免 `equals`；equals 昂贵 + 大规模下 `containsKey` / `add` / `put` 领先 JDK **9~26%**；原始值版每条目 24 B，比装箱 `HashMap`（44 B）**省 45% 内存**。
 - **并发缓存与驻留器（`cache`）**：分段 `StampedLock` 读路径与 `ConcurrentHashMap` 同量级，写路径反超（111 vs 81 ops/µs）；弱引用清理写入路径顺手完成，稳态零开销。
 
 ## 包结构
@@ -99,20 +99,26 @@
 
 ### O2X 开放寻址缓存容器（`fastutil` 包）
 
-`O2OOpenCacheHashMap` vs JDK `HashMap` vs fastutil `Object2ObjectOpenHashMap`（4096 条，ops/µs）：
+`O2OOpenCacheHashMap` vs JDK `HashMap` vs fastutil `Object2ObjectOpenHashMap`（4096 条，ops/µs；探测为三层短路：存储哈希 → `==` 引用相等 → `equals`）：
 
 | 操作 | 键类型 | O2O OpenCache | JDK HashMap | fastutil Open |
 |---|---|---:|---:|---:|
-| `containsKey` 命中 | String | **87** | 71 | 72 |
-| `containsKey` 命中 | ExpensiveKey | **49** | 33 | 34 |
-| `get` 命中 | String | 60 | **69** | 60 |
-| `get` 命中 | ExpensiveKey | **32** | 33 | 33 |
-| `put` 覆盖 | String | **60** | 55 | 57 |
-| `put` 覆盖 | ExpensiveKey | **39** | 35 | 36 |
+| `containsKey` 命中 | String | 99 | **105** | 82 |
+| `containsKey` 命中 | ExpensiveKey | **53** | 49 | 47 |
+| `get` 命中 | String | 92 | **103** | 73 |
+| `get` 命中 | ExpensiveKey | **50** | 49 | 46 |
+| `put` 覆盖 | String | **73** | 60 | 59 |
+| `put` 覆盖 | ExpensiveKey | **46** | 38 | 38 |
 
-`OpenCacheHashSet`（4096 条）同场景 `add` 已存在键：String **82** vs JDK 53 vs fastutil 84；ExpensiveKey **52** vs 36 vs 46 ops/µs。
+`OpenCacheHashSet`（4096 条）：`add` 已存在键 —— String **92** vs JDK 58 vs fastutil 85；ExpensiveKey **50** vs 40 vs 48。`contains` —— String 99 vs **105** vs 82；ExpensiveKey **53** vs 49 vs 48 ops/µs。
 
-每槽缓存键哈希的收益随「equals 成本 × 探测链长度」放大：equals 昂贵的大规模场景下 `containsKey` / `add` **领先 40~45%**，String 场景 `containsKey`/`put` 亦领先 8~20%；纯 `get` 小规模下 JDK 凭短链与内联优化领先。`O2I` / `O2L` / … 系列同时继承 fastutil 全套原始方法，无装箱。
+收益来源是探测链上的三层短路，每层都比 `equals` 便宜得多：
+
+1. **存储哈希先行**（每槽缓存 `hashCode`）：哈希不符直接跳过，`equals` 只在候选槽上执行；rehash 复用存储哈希、免重算；
+2. **`==` 引用相等**（同 JDK `HashMap` 的优化）：同一键实例重复查询时免 `equals`——缓存/驻留场景的典型访问模式，实测为此贡献 `get` +53%、`put` +18~22%（相对加入前的同库版本）；
+3. 前两层都过才落到 `equals`，equals 昂贵的键（`ExpensiveKey`）与写路径（`put` +20~22%、`add` +26%）对 JDK 的优势最大；`String` 小规模下 JDK 凭短链与内联仍略领先。
+
+`O2I` / `O2L` / … 系列同时继承 fastutil 全套原始方法，无装箱。
 
 ### 内存占用
 

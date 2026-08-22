@@ -104,7 +104,7 @@ public final class OpenCustomCacheHashSet<K> extends ObjectOpenCustomHashSet<K> 
             int pos;
             if ((curr = key[pos = HashCommon.mix(h) & mask]) != null) {
                 do {
-                    if (hash[pos] == h && strategy.equals(k, curr)) return false;
+                    if (hash[pos] == h && (k == curr || strategy.equals(k, curr))) return false;
                 } while ((curr = key[pos = (pos + 1) & mask]) != null);
             }
             key[pos] = k;
@@ -127,7 +127,7 @@ public final class OpenCustomCacheHashSet<K> extends ObjectOpenCustomHashSet<K> 
             int pos;
             if ((curr = key[pos = HashCommon.mix(h) & mask]) != null) {
                 do {
-                    if (hash[pos] == h && strategy.equals(k, curr)) return curr;
+                    if (hash[pos] == h && (k == curr || strategy.equals(k, curr))) return curr;
                 } while ((curr = key[pos = (pos + 1) & mask]) != null);
             }
             key[pos] = k;
@@ -187,10 +187,10 @@ public final class OpenCustomCacheHashSet<K> extends ObjectOpenCustomHashSet<K> 
         final int[] hash = this.hash;
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
-        if (hash[pos] == h && strategy.equals(kk, curr)) return removeEntry(pos);
+        if (hash[pos] == h && (kk == curr || strategy.equals(kk, curr))) return removeEntry(pos);
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return false;
-            if (hash[pos] == h && strategy.equals(kk, curr)) return removeEntry(pos);
+            if (hash[pos] == h && (kk == curr || strategy.equals(kk, curr))) return removeEntry(pos);
         }
     }
 
@@ -205,10 +205,10 @@ public final class OpenCustomCacheHashSet<K> extends ObjectOpenCustomHashSet<K> 
         final int[] hash = this.hash;
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
-        if (hash[pos] == h && strategy.equals(kk, curr)) return true;
+        if (hash[pos] == h && (kk == curr || strategy.equals(kk, curr))) return true;
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return false;
-            if (hash[pos] == h && strategy.equals(kk, curr)) return true;
+            if (hash[pos] == h && (kk == curr || strategy.equals(kk, curr))) return true;
         }
     }
 
@@ -223,10 +223,10 @@ public final class OpenCustomCacheHashSet<K> extends ObjectOpenCustomHashSet<K> 
         final int[] hash = this.hash;
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return null;
-        if (hash[pos] == h && strategy.equals(kk, curr)) return curr;
+        if (hash[pos] == h && (kk == curr || strategy.equals(kk, curr))) return curr;
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return null;
-            if (hash[pos] == h && strategy.equals(kk, curr)) return curr;
+            if (hash[pos] == h && (kk == curr || strategy.equals(kk, curr))) return curr;
         }
     }
 
