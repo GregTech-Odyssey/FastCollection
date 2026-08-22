@@ -1,54 +1,54 @@
-package com.gto.fastcollection;
+package com.gto.fastcollection.fastutil;
 
 import it.unimi.dsi.fastutil.HashCommon;
-import it.unimi.dsi.fastutil.longs.*;
+import it.unimi.dsi.fastutil.bytes.*;
 import it.unimi.dsi.fastutil.objects.*;
 
 import java.util.Arrays;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
-import java.util.function.ToLongFunction;
+import java.util.function.ToIntFunction;
 
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 import static it.unimi.dsi.fastutil.HashCommon.maxFill;
 
-public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHashMap<K> {
+public final class O2BOpenCustomCacheHashMap<K> extends Object2ByteOpenCustomHashMap<K> {
 
     private int[] hash;
 
-    public O2LOpenCustomCacheHashMap(final int expected, final float f, final Strategy<? super K> strategy) {
+    public O2BOpenCustomCacheHashMap(final int expected, final float f, final Strategy<? super K> strategy) {
         super(expected, f, strategy);
         hash = new int[n + 1];
     }
 
-    public O2LOpenCustomCacheHashMap(final int expected, final Strategy<? super K> strategy) {
+    public O2BOpenCustomCacheHashMap(final int expected, final Strategy<? super K> strategy) {
         super(expected, DEFAULT_LOAD_FACTOR, strategy);
         hash = new int[n + 1];
     }
 
-    public O2LOpenCustomCacheHashMap(final Strategy<? super K> strategy) {
+    public O2BOpenCustomCacheHashMap(final Strategy<? super K> strategy) {
         super(DEFAULT_INITIAL_SIZE, DEFAULT_LOAD_FACTOR, strategy);
         hash = new int[n + 1];
     }
 
-    public O2LOpenCustomCacheHashMap(final Map<? extends K, ? extends Long> m, final float f, final Strategy<? super K> strategy) {
+    public O2BOpenCustomCacheHashMap(final Map<? extends K, ? extends Byte> m, final float f, final Strategy<? super K> strategy) {
         super(m.size(), f, strategy);
         hash = new int[n + 1];
         putAll(m);
     }
 
-    public O2LOpenCustomCacheHashMap(final Map<? extends K, ? extends Long> m, final Strategy<? super K> strategy) {
+    public O2BOpenCustomCacheHashMap(final Map<? extends K, ? extends Byte> m, final Strategy<? super K> strategy) {
         this(m, DEFAULT_LOAD_FACTOR, strategy);
     }
 
-    public O2LOpenCustomCacheHashMap(final Object2LongMap<K> m, final float f, final Strategy<? super K> strategy) {
+    public O2BOpenCustomCacheHashMap(final Object2ByteMap<K> m, final float f, final Strategy<? super K> strategy) {
         super(m.size(), f, strategy);
         hash = new int[n + 1];
         putAll(m);
     }
 
-    public O2LOpenCustomCacheHashMap(final Object2LongMap<K> m, final Strategy<? super K> strategy) {
+    public O2BOpenCustomCacheHashMap(final Object2ByteMap<K> m, final Strategy<? super K> strategy) {
         this(m, DEFAULT_LOAD_FACTOR, strategy);
     }
 
@@ -56,13 +56,13 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
         return containsNullKey ? size - 1 : size;
     }
 
-    private long removeEntry(int pos) {
-        final long oldValue = value[pos];
+    private byte removeEntry(int pos) {
+        final byte oldValue = value[pos];
         size--;
         int last, slot, ch;
         K curr;
         final K[] key = this.key;
-        final long[] value = this.value;
+        final byte[] value = this.value;
         final int[] hash = this.hash;
         final int mask = this.mask;
         a:
@@ -88,11 +88,11 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
         return oldValue;
     }
 
-    private long removeNullEntry() {
+    private byte removeNullEntry() {
         containsNullKey = false;
         key[n] = null;
         hash[n] = 0;
-        final long oldValue = value[n];
+        final byte oldValue = value[n];
         size--;
         if (n > minN && size < maxFill / 4 && n > DEFAULT_INITIAL_SIZE) rehash(n / 2);
         return oldValue;
@@ -112,7 +112,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
         }
     }
 
-    private void insert(final int pos, final K k, final long v, final int h) {
+    private void insert(final int pos, final K k, final byte v, final int h) {
         if (pos == n) containsNullKey = true;
         key[pos] = k;
         value[pos] = v;
@@ -121,7 +121,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
     }
 
     @Override
-    public long put(final K k, final long v) {
+    public byte put(final K k, final byte v) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -133,19 +133,19 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
             insert(-pos - 1, k, v, h);
             return defRetValue;
         }
-        final long oldValue = value[pos];
+        final byte oldValue = value[pos];
         value[pos] = v;
         return oldValue;
     }
 
-    private long addToValue(final int pos, final long incr) {
-        final long oldValue = value[pos];
-        value[pos] = oldValue + incr;
+    private byte addToValue(final int pos, final byte incr) {
+        final byte oldValue = value[pos];
+        value[pos] = (byte)(oldValue + incr);
         return oldValue;
     }
 
     @Override
-    public long addTo(final K k, final long incr) {
+    public byte addTo(final K k, final byte incr) {
         int pos, h = 0;
         if (k == null) {
             if (containsNullKey) return addToValue(n, incr);
@@ -164,13 +164,13 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
         }
         key[pos] = k;
         hash[pos] = h;
-        value[pos] = defRetValue + incr;
+        value[pos] = (byte)(defRetValue + incr);
         if (size++ >= maxFill) rehash(arraySize(size + 1, f));
         return defRetValue;
     }
 
     @Override
-    public long removeLong(final Object k) {
+    public byte removeByte(final Object k) {
         if (k == null) {
             if (containsNullKey) return removeNullEntry();
             return defRetValue;
@@ -191,7 +191,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
     }
 
     @Override
-    public long getLong(final Object k) {
+    public byte getByte(final Object k) {
         if (k == null) return containsNullKey ? value[n] : defRetValue;
         K fk = (K) k;
         K curr;
@@ -227,7 +227,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
     }
 
     @Override
-    public long getOrDefault(final Object k, final long defaultValue) {
+    public byte getOrDefault(final Object k, final byte defaultValue) {
         if (k == null) return containsNullKey ? value[n] : defaultValue;
         K fk = (K) k;
         K curr;
@@ -245,7 +245,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
     }
 
     @Override
-    public long putIfAbsent(final K k, final long v) {
+    public byte putIfAbsent(final K k, final byte v) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -259,7 +259,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
     }
 
     @Override
-    public boolean remove(final Object k, final long v) {
+    public boolean remove(final Object k, final byte v) {
         if (k == null) {
             if (containsNullKey && v == value[n]) {
                 removeNullEntry();
@@ -289,7 +289,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
     }
 
     @Override
-    public boolean replace(final K k, final long oldValue, final long v) {
+    public boolean replace(final K k, final byte oldValue, final byte v) {
         int pos;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -303,7 +303,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
     }
 
     @Override
-    public long replace(final K k, final long v) {
+    public byte replace(final K k, final byte v) {
         int pos;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -312,13 +312,13 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
             pos = find(k, h);
         }
         if (pos < 0) return defRetValue;
-        final long oldValue = value[pos];
+        final byte oldValue = value[pos];
         value[pos] = v;
         return oldValue;
     }
 
     @Override
-    public long computeIfAbsent(final K k, final ToLongFunction<? super K> mappingFunction) {
+    public byte computeIfAbsent(final K k, final ToIntFunction<? super K> mappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -327,13 +327,13 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
             pos = find(k, h);
         }
         if (pos >= 0) return value[pos];
-        final long newValue = mappingFunction.applyAsLong(k);
+        final byte newValue = it.unimi.dsi.fastutil.SafeMath.safeIntToByte(mappingFunction.applyAsInt(k));
         insert(-pos - 1, k, newValue, h);
         return newValue;
     }
 
     @Override
-    public long computeIfAbsent(final K k, final Object2LongFunction<? super K> mappingFunction) {
+    public byte computeIfAbsent(final K k, final Object2ByteFunction<? super K> mappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -343,13 +343,13 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
         }
         if (pos >= 0) return value[pos];
         if (!mappingFunction.containsKey(key)) return defRetValue;
-        final long newValue = mappingFunction.applyAsLong(k);
+        final byte newValue = mappingFunction.getByte(k);
         insert(-pos - 1, k, newValue, h);
         return newValue;
     }
 
     @Override
-    public long computeLongIfPresent(final K k, final BiFunction<? super K, ? super Long, ? extends Long> remappingFunction) {
+    public byte computeByteIfPresent(final K k, final BiFunction<? super K, ? super Byte, ? extends Byte> remappingFunction) {
         int pos;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -358,7 +358,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
             pos = find(k, h);
         }
         if (pos < 0) return defRetValue;
-        final Long newValue = remappingFunction.apply((k), value[pos]);
+        final Byte newValue = remappingFunction.apply((k), Byte.valueOf(value[pos]));
         if (newValue == null) {
             if (k == null) removeNullEntry();
             else removeEntry(pos);
@@ -368,7 +368,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
     }
 
     @Override
-    public long computeLong(final K k, final BiFunction<? super K, ? super Long, ? extends Long> remappingFunction) {
+    public byte computeByte(final K k, final BiFunction<? super K, ? super Byte, ? extends Byte> remappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -376,7 +376,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
             h = strategy.hashCode(k);
             pos = find(k, h);
         }
-        final Long newValue = remappingFunction.apply((k), pos >= 0 ? value[pos] : null);
+        final Byte newValue = remappingFunction.apply((k), pos >= 0 ? Byte.valueOf(value[pos]) : null);
         if (newValue == null) {
             if (pos >= 0) {
                 if (k == null) removeNullEntry();
@@ -384,7 +384,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
             }
             return defRetValue;
         }
-        long newVal = newValue;
+        byte newVal = newValue;
         if (pos < 0) {
             insert(-pos - 1, k, newVal, h);
             return newVal;
@@ -394,7 +394,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
 
     /** {@inheritDoc} */
     @Override
-    public long mergeLong(final K k, final long v, java.util.function.LongBinaryOperator remappingFunction) {
+    public byte mergeByte(final K k, final byte v, it.unimi.dsi.fastutil.bytes.ByteBinaryOperator remappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -406,12 +406,12 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
             insert(-pos - 1, k, v, h);
             return v;
         }
-        final long newValue = remappingFunction.applyAsLong(value[pos], v);
+        final byte newValue = remappingFunction.apply(value[pos], v);
         return value[pos] = newValue;
     }
 
     @Override
-    public long merge(final K k, final long v, final BiFunction<? super Long, ? super Long, ? extends Long> remappingFunction) {
+    public byte merge(final K k, final byte v, final BiFunction<? super Byte, ? super Byte, ? extends Byte> remappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -423,7 +423,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
             insert(-pos - 1, k, v, h);
             return v;
         }
-        final Long newValue = remappingFunction.apply(value[pos], v);
+        final Byte newValue = remappingFunction.apply(Byte.valueOf(value[pos]), Byte.valueOf(v));
         if (newValue == null) {
             if (k == null) removeNullEntry();
             else removeEntry(pos);
@@ -441,7 +441,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
         Arrays.fill(hash, 0);
     }
 
-    final class MapEntry implements Entry<K>, ObjectLongPair<K> {
+    final class MapEntry implements Entry<K>, ObjectBytePair<K> {
 
         int index;
 
@@ -462,51 +462,51 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
         }
 
         @Override
-        public long getLongValue() {
+        public byte getByteValue() {
             return value[index];
         }
 
         @Override
-        public long rightLong() {
+        public byte rightByte() {
             return value[index];
         }
 
         @Override
-        public long setValue(final long v) {
-            final long oldValue = value[index];
+        public byte setValue(final byte v) {
+            final byte oldValue = value[index];
             value[index] = v;
             return oldValue;
         }
 
         @Override
-        public ObjectLongPair<K> right(final long v) {
+        public ObjectBytePair<K> right(final byte v) {
             value[index] = v;
             return this;
         }
 
         @Deprecated
         @Override
-        public Long getValue() {
+        public Byte getValue() {
             return value[index];
         }
 
         @Deprecated
         @Override
-        public Long setValue(final Long v) {
-            return setValue((v).longValue());
+        public Byte setValue(final Byte v) {
+            return Byte.valueOf(setValue((v).byteValue()));
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public boolean equals(final Object o) {
             if (!(o instanceof Map.Entry)) return false;
-            Map.Entry<K, Long> e = (Map.Entry<K, Long>) o;
-            return strategy.equals(key[index], (e.getKey())) && ((value[index]) == (e.getValue()));
+            Map.Entry<K, Byte> e = (Map.Entry<K, Byte>) o;
+            return strategy.equals(key[index], (e.getKey())) && ((value[index]) == ((e.getValue()).byteValue()));
         }
 
         @Override
         public int hashCode() {
-            return hash[index] ^ HashCommon.long2int(value[index]);
+            return hash[index] ^ value[index];
         }
 
         @Override
@@ -520,7 +520,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
         int pos = n;
         int last = -1;
         int c = size;
-        boolean mustReturnNullKey = O2LOpenCustomCacheHashMap.this.containsNullKey;
+        boolean mustReturnNullKey = O2BOpenCustomCacheHashMap.this.containsNullKey;
         ObjectArrayList<K> wrapped;
 
         abstract void acceptOnIndex(final ConsumerType action, final int index);
@@ -535,9 +535,9 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
                 mustReturnNullKey = false;
                 return last = n;
             }
-            final K[] key = O2LOpenCustomCacheHashMap.this.key;
-            final int[] hash = O2LOpenCustomCacheHashMap.this.hash;
-            final int mask = O2LOpenCustomCacheHashMap.this.mask;
+            final K[] key = O2BOpenCustomCacheHashMap.this.key;
+            final int[] hash = O2BOpenCustomCacheHashMap.this.hash;
+            final int mask = O2BOpenCustomCacheHashMap.this.mask;
             for (;;) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
@@ -557,8 +557,8 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
                 acceptOnIndex(action, last = n);
                 c--;
             }
-            final K[] key = O2LOpenCustomCacheHashMap.this.key;
-            final int[] hash = O2LOpenCustomCacheHashMap.this.hash;
+            final K[] key = O2BOpenCustomCacheHashMap.this.key;
+            final int[] hash = O2BOpenCustomCacheHashMap.this.hash;
             while (c != 0) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
@@ -578,10 +578,10 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
         private void shiftKeys(int pos) {
             int last, slot, ch;
             K curr;
-            final K[] key = O2LOpenCustomCacheHashMap.this.key;
-            final long[] value = O2LOpenCustomCacheHashMap.this.value;
-            final int[] hash = O2LOpenCustomCacheHashMap.this.hash;
-            final int mask = O2LOpenCustomCacheHashMap.this.mask;
+            final K[] key = O2BOpenCustomCacheHashMap.this.key;
+            final byte[] value = O2BOpenCustomCacheHashMap.this.value;
+            final int[] hash = O2BOpenCustomCacheHashMap.this.hash;
+            final int mask = O2BOpenCustomCacheHashMap.this.mask;
             for (;;) {
                 pos = ((last = pos) + 1) & mask;
                 for (;;) {
@@ -612,7 +612,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
                 hash[n] = 0;
             } else if (pos >= 0) shiftKeys(last);
             else {
-                O2LOpenCustomCacheHashMap.this.removeLong(wrapped.set(-pos - 1, null));
+                O2BOpenCustomCacheHashMap.this.removeByte(wrapped.set(-pos - 1, null));
                 last = -1;
                 return;
             }
@@ -670,7 +670,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
         int pos = 0;
         int max = n;
         int c = 0;
-        boolean mustReturnNull = O2LOpenCustomCacheHashMap.this.containsNullKey;
+        boolean mustReturnNull = O2BOpenCustomCacheHashMap.this.containsNullKey;
         boolean hasSplit = false;
 
         MapSpliterator() {}
@@ -693,7 +693,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
                 acceptOnIndex(action, n);
                 return true;
             }
-            final K[] key = O2LOpenCustomCacheHashMap.this.key;
+            final K[] key = O2BOpenCustomCacheHashMap.this.key;
             while (pos < max) {
                 if (!((key[pos]) == null)) {
                     ++c;
@@ -711,7 +711,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
                 ++c;
                 acceptOnIndex(action, n);
             }
-            final K[] key = O2LOpenCustomCacheHashMap.this.key;
+            final K[] key = O2BOpenCustomCacheHashMap.this.key;
             while (pos < max) {
                 if (!((key[pos]) == null)) {
                     acceptOnIndex(action, pos);
@@ -742,15 +742,15 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
             return split;
         }
 
-        public long skip(long n) {
+        public int skip(int n) {
             if (n == 0) return 0;
-            long skipped = 0;
+            int skipped = 0;
             if (mustReturnNull) {
                 mustReturnNull = false;
                 ++skipped;
                 --n;
             }
-            final K[] key = O2LOpenCustomCacheHashMap.this.key;
+            final K[] key = O2BOpenCustomCacheHashMap.this.key;
             while (pos < max && n > 0) {
                 if (!((key[pos++]) == null)) {
                     ++skipped;
@@ -809,13 +809,13 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
         public boolean contains(final Object o) {
             if (!(o instanceof Map.Entry)) return false;
             final Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
-            if (e.getValue() == null || !(e.getValue() instanceof Long)) return false;
+            if (e.getValue() == null || !(e.getValue() instanceof Byte)) return false;
             final K k = ((K) e.getKey());
-            final long v = (Long) (e.getValue());
-            if (((k) == null)) return O2LOpenCustomCacheHashMap.this.containsNullKey && ((value[n]) == (v));
+            final byte v = ((Byte) (e.getValue())).byteValue();
+            if (((k) == null)) return O2BOpenCustomCacheHashMap.this.containsNullKey && ((value[n]) == (v));
             K curr;
-            final K[] key = O2LOpenCustomCacheHashMap.this.key;
-            final int mask = O2LOpenCustomCacheHashMap.this.mask;
+            final K[] key = O2BOpenCustomCacheHashMap.this.key;
+            final int mask = O2BOpenCustomCacheHashMap.this.mask;
             int pos;
             if (((curr = key[pos = (HashCommon.mix(strategy.hashCode(k))) & mask]) == null)) return false;
             if (strategy.equals(k, curr)) return ((value[pos]) == (v));
@@ -830,9 +830,9 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
         public boolean remove(final Object o) {
             if (!(o instanceof Map.Entry)) return false;
             final Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
-            if (e.getValue() == null || !(e.getValue() instanceof Long)) return false;
+            if (e.getValue() == null || !(e.getValue() instanceof Byte)) return false;
             final K k = ((K) e.getKey());
-            final long v = (Long) (e.getValue());
+            final byte v = ((Byte) (e.getValue())).byteValue();
             if (((k) == null)) {
                 if (containsNullKey && ((value[n]) == (v))) {
                     removeNullEntry();
@@ -841,8 +841,8 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
                 return false;
             }
             K curr;
-            final K[] key = O2LOpenCustomCacheHashMap.this.key;
-            final int mask = O2LOpenCustomCacheHashMap.this.mask;
+            final K[] key = O2BOpenCustomCacheHashMap.this.key;
+            final int mask = O2BOpenCustomCacheHashMap.this.mask;
             int pos;
             if (((curr = key[pos = (HashCommon.mix(strategy.hashCode(k))) & mask]) == null)) return false;
             if (strategy.equals(k, curr)) {
@@ -870,13 +870,13 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
 
         @Override
         public void clear() {
-            O2LOpenCustomCacheHashMap.this.clear();
+            O2BOpenCustomCacheHashMap.this.clear();
         }
 
         @Override
         public void forEach(final Consumer<? super Entry<K>> consumer) {
             if (containsNullKey) consumer.accept(new MapEntry(n));
-            final K[] key = O2LOpenCustomCacheHashMap.this.key;
+            final K[] key = O2BOpenCustomCacheHashMap.this.key;
             for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) consumer.accept(new MapEntry(pos));
         }
 
@@ -888,7 +888,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
                 entry.index = n;
                 consumer.accept(entry);
             }
-            final K[] key = O2LOpenCustomCacheHashMap.this.key;
+            final K[] key = O2BOpenCustomCacheHashMap.this.key;
             for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) {
                 entry.index = pos;
                 consumer.accept(entry);
@@ -897,7 +897,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
     }
 
     @Override
-    public FastEntrySet<K> object2LongEntrySet() {
+    public FastEntrySet<K> object2ByteEntrySet() {
         if (entries == null) entries = new MapEntrySet();
         return entries;
     }
@@ -960,7 +960,7 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
         /** {@inheritDoc} */
         @Override
         public void forEach(final Consumer<? super K> consumer) {
-            final K[] key = O2LOpenCustomCacheHashMap.this.key;
+            final K[] key = O2BOpenCustomCacheHashMap.this.key;
             if (containsNullKey) consumer.accept(key[n]);
             for (int pos = n; pos-- != 0;) {
                 final K k = key[pos];
@@ -981,13 +981,13 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
         @Override
         public boolean remove(Object k) {
             final int oldSize = size;
-            O2LOpenCustomCacheHashMap.this.removeLong(k);
+            O2BOpenCustomCacheHashMap.this.removeByte(k);
             return size != oldSize;
         }
 
         @Override
         public void clear() {
-            O2LOpenCustomCacheHashMap.this.clear();
+            O2BOpenCustomCacheHashMap.this.clear();
         }
     }
 
@@ -997,26 +997,26 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
         return keys;
     }
 
-    private final class ValueIterator extends MapIterator<java.util.function.LongConsumer> implements LongIterator {
+    private final class ValueIterator extends MapIterator<ByteConsumer> implements ByteIterator {
 
         public ValueIterator() {
             super();
         }
 
         @Override
-        void acceptOnIndex(final java.util.function.LongConsumer action, final int index) {
+        void acceptOnIndex(final ByteConsumer action, final int index) {
             action.accept(value[index]);
         }
 
         @Override
-        public long nextLong() {
+        public byte nextByte() {
             return value[nextEntry()];
         }
     }
 
-    private final class ValueSpliterator extends MapSpliterator<java.util.function.LongConsumer, ValueSpliterator> implements LongSpliterator {
+    private final class ValueSpliterator extends MapSpliterator<ByteConsumer, ValueSpliterator> implements ByteSpliterator {
 
-        private static final int POST_SPLIT_CHARACTERISTICS = LongSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
+        private static final int POST_SPLIT_CHARACTERISTICS = ByteSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
 
         ValueSpliterator() {}
 
@@ -1026,11 +1026,11 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
 
         @Override
         public int characteristics() {
-            return hasSplit ? POST_SPLIT_CHARACTERISTICS : LongSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS;
+            return hasSplit ? POST_SPLIT_CHARACTERISTICS : ByteSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS;
         }
 
         @Override
-        void acceptOnIndex(final java.util.function.LongConsumer action, final int index) {
+        void acceptOnIndex(final ByteConsumer action, final int index) {
             action.accept(value[index]);
         }
 
@@ -1041,24 +1041,24 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
     }
 
     @Override
-    public LongCollection values() {
-        if (values == null) values = new AbstractLongCollection() {
+    public ByteCollection values() {
+        if (values == null) values = new AbstractByteCollection() {
 
             @Override
-            public LongIterator iterator() {
+            public ByteIterator iterator() {
                 return new ValueIterator();
             }
 
             @Override
-            public LongSpliterator spliterator() {
+            public ByteSpliterator spliterator() {
                 return new ValueSpliterator();
             }
 
             /** {@inheritDoc} */
             @Override
-            public void forEach(final java.util.function.LongConsumer consumer) {
-                final K[] key = O2LOpenCustomCacheHashMap.this.key;
-                final long[] value = O2LOpenCustomCacheHashMap.this.value;
+            public void forEach(final ByteConsumer consumer) {
+                final K[] key = O2BOpenCustomCacheHashMap.this.key;
+                final byte[] value = O2BOpenCustomCacheHashMap.this.value;
                 if (containsNullKey) consumer.accept(value[n]);
                 for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) consumer.accept(value[pos]);
             }
@@ -1069,13 +1069,13 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
             }
 
             @Override
-            public boolean contains(long v) {
+            public boolean contains(byte v) {
                 return containsValue(v);
             }
 
             @Override
             public void clear() {
-                O2LOpenCustomCacheHashMap.this.clear();
+                O2BOpenCustomCacheHashMap.this.clear();
             }
         };
         return values;
@@ -1084,11 +1084,11 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
     @SuppressWarnings("unchecked")
     protected void rehash(final int newN) {
         final K[] key = this.key;
-        final long[] value = this.value;
+        final byte[] value = this.value;
         final int[] hash = this.hash;
         final int mask = newN - 1;
         final K[] newKey = (K[]) new Object[newN + 1];
-        final long[] newValue = new long[newN + 1];
+        final byte[] newValue = new byte[newN + 1];
         final int[] newHash = new int[newN + 1];
         int i = n, pos, h;
         for (int j = realSize(); j-- != 0;) {
@@ -1108,8 +1108,8 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
     }
 
     @Override
-    public O2LOpenCustomCacheHashMap<K> clone() {
-        O2LOpenCustomCacheHashMap<K> c = (O2LOpenCustomCacheHashMap<K>) super.clone();
+    public O2BOpenCustomCacheHashMap<K> clone() {
+        O2BOpenCustomCacheHashMap<K> c = (O2BOpenCustomCacheHashMap<K>) super.clone();
         c.hash = hash.clone();
         return c;
     }
@@ -1118,16 +1118,16 @@ public final class O2LOpenCustomCacheHashMap<K> extends Object2LongOpenCustomHas
     public int hashCode() {
         int h = 0;
         final K[] key = this.key;
-        final long[] value = this.value;
+        final byte[] value = this.value;
         final int[] hash = this.hash;
         for (int j = realSize(), i = 0, t = 0; j-- != 0;) {
             while (((key[i]) == null)) i++;
             if (this != key[i]) t = hash[i];
-            t ^= HashCommon.long2int(value[i]);
+            t ^= value[i];
             h += t;
             i++;
         }
-        if (containsNullKey) h += HashCommon.long2int(value[n]);
+        if (containsNullKey) h += value[n];
         return h;
     }
 }

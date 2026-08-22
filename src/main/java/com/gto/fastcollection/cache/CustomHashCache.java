@@ -1,5 +1,6 @@
 package com.gto.fastcollection.cache;
 
+import com.gto.fastcollection.Concurrents;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 
@@ -18,30 +19,25 @@ import static it.unimi.dsi.fastutil.HashCommon.arraySize;
  *
  * <p>Thread safety: segment count is a power of two rounded up from the requested
  * concurrency level; operations on distinct segments proceed fully in parallel.
- * Reads use an optimistic fast path and fall back to a shared read lock, while
- * writes take the exclusive write lock, so read-heavy workloads avoid lock
- * contention almost entirely.
+ * Reads take the segment's shared read lock while writes take the exclusive
+ * write lock, so readers never block each other.
  */
-public final class CustomHashCache<K, V> implements MapCache<K, V> {
+public final class CustomHashCache<K, V> extends Segmented<CustomHashCache.Segment<K, V>> implements MapCache<K, V> {
 
     private final Hash.Strategy<? super K> strategy;
-    private final Segment<K, V>[] segments;
-    private final int segmentShift;
-    private final int segmentMask;
     private final Function<? super K, ? extends V> createFunction;
 
     /** Creates a cache with default concurrency and no factory. */
     public CustomHashCache(Hash.Strategy<? super K> strategy) {
-        this(strategy, Runtime.getRuntime().availableProcessors(), null);
+        this(strategy, Concurrents.NCPU, null);
     }
 
     /**
-     * Creates a cache with default concurrency and the given factory.
-     *
-     * @throws NullPointerException if {@code createFunction} is {@code null}
+     * Creates a cache with default concurrency and the given factory;
+     * {@code null} is allowed and behaves like the no-factory constructor.
      */
     public CustomHashCache(Hash.Strategy<? super K> strategy, Function<? super K, ? extends V> createFunction) {
-        this(strategy, Runtime.getRuntime().availableProcessors(), createFunction);
+        this(strategy, Concurrents.NCPU, createFunction);
     }
 
     /** Creates a cache with the given concurrency level and no factory. */
@@ -55,33 +51,20 @@ public final class CustomHashCache<K, V> implements MapCache<K, V> {
      * @param concurrencyLevel upper bound on the number of threads concurrently
      *                         updating distinct segments; rounded up to a power of two
      * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
-     * @throws NullPointerException     if {@code createFunction} is {@code null}
      */
-    @SuppressWarnings("unchecked")
     public CustomHashCache(Hash.Strategy<? super K> strategy, int concurrencyLevel,
                            Function<? super K, ? extends V> createFunction) {
-        if (concurrencyLevel <= 0) throw new IllegalArgumentException("concurrencyLevel must be positive");
+        super(concurrencyLevel, i -> new Segment<>(strategy));
         this.strategy = strategy;
         this.createFunction = createFunction;
-        int ssize = 1;
-        while (ssize < concurrencyLevel) {
-            ssize <<= 1;
-        }
-        this.segmentShift = 32 - Integer.numberOfTrailingZeros(ssize);
-        this.segmentMask = ssize - 1;
-        this.segments = new Segment[ssize];
-        for (int i = 0; i < ssize; i++) {
-            segments[i] = new Segment<>(strategy);
-        }
     }
 
     /** {@inheritDoc} The function runs under the segment's write lock; it must not recurse. */
     @Override
     public V getCache(final K k, Function<? super K, ? extends V> createFunction) {
         int hash = strategy.hashCode(k);
-        int mix = hash * -1640531527;
-        mix ^= mix >>> 16;
-        return segments[(mix >>> segmentShift) & segmentMask].getCache(k, hash, mix, createFunction);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).getCache(k, hash, mix, createFunction);
     }
 
     /** {@inheritDoc} */
@@ -94,18 +77,16 @@ public final class CustomHashCache<K, V> implements MapCache<K, V> {
     @Override
     public V getCache(final K k) {
         int hash = strategy.hashCode(k);
-        int mix = hash * -1640531527;
-        mix ^= mix >>> 16;
-        return segments[(mix >>> segmentShift) & segmentMask].getCache(k, hash, mix, createFunction);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).getCache(k, hash, mix, createFunction);
     }
 
     /** {@inheritDoc} Runs the function outside all locks, so it may recurse. */
     @Override
     public V getCacheRecursive(final K k, Function<? super K, ? extends V> createFunction) {
         int hash = strategy.hashCode(k);
-        int mix = hash * -1640531527;
-        mix ^= mix >>> 16;
-        return segments[(mix >>> segmentShift) & segmentMask].getCacheRecursive(k, hash, mix, createFunction);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).getCacheRecursive(k, hash, mix, createFunction);
     }
 
     /** {@inheritDoc} Uses the constructor factory. */
@@ -118,72 +99,71 @@ public final class CustomHashCache<K, V> implements MapCache<K, V> {
     @Override
     public V getIfPresent(final K k) {
         int hash = strategy.hashCode(k);
-        int mix = hash * -1640531527;
-        mix ^= mix >>> 16;
-        return segments[(mix >>> segmentShift) & segmentMask].getIfAbsent(k, hash, mix);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).getIfAbsent(k, hash, mix);
     }
 
     /** {@inheritDoc} */
     @Override
     public V putIfAbsent(final K k, final V v) {
         int hash = strategy.hashCode(k);
-        int mix = hash * -1640531527;
-        mix ^= mix >>> 16;
-        return segments[(mix >>> segmentShift) & segmentMask].put(k, v, hash, mix);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).put(k, v, hash, mix);
     }
 
     /** {@inheritDoc} */
     @Override
     public void clear() {
-        for (var seg : segments) {
-            seg.clear();
-        }
+        clearSegments();
     }
 
 
     /**
-     * A striped segment: an independently locked open-addressing-free hash table
-     * (separate chaining) that extends {@link StampedLock} so lock calls are
-     * direct. Only the segment's own table is touched while its lock is held;
-     * other segments proceed in parallel. {@code table}/{@code mask} are volatile
-     * because a resize swaps them; {@code size}/{@code maxFill} are only mutated
-     * under the write lock and read under the read lock.
+     * A striped segment: an independently locked separate-chaining hash table
+     * on the shared {@link HashSegment} skeleton; keys are hashed and compared
+     * by the cache's {@link Hash.Strategy}.
      */
-    private final static class Segment<K, V> extends StampedLock {
+    final static class Segment<K, V> extends HashSegment<Node<K, V>> {
         private final Hash.Strategy<? super K> strategy;
-        private volatile Node<K, V>[] table;
-        private volatile int mask;
-        private volatile int size;
-        private volatile int maxFill;
 
-        @SuppressWarnings("unchecked")
         private Segment(Hash.Strategy<? super K> strategy) {
             this.strategy = strategy;
-            int n = arraySize(Hash.DEFAULT_INITIAL_SIZE, Hash.DEFAULT_LOAD_FACTOR);
-            this.table = new Node[n];
-            this.mask = n - 1;
-            this.maxFill = (int) (n * Hash.DEFAULT_LOAD_FACTOR);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        protected Node<K, V>[] newArray(int capacity) {
+            return new Node[capacity];
+        }
+
+        @Override
+        protected int nodeHash(Node<K, V> node) {
+            return node.hash;
+        }
+
+        @Override
+        protected boolean isDead(Node<K, V> node) {
+            return false;
         }
 
         /**
-         * Fast-path read via optimistic locking; on a stale or empty probe, the
-         * function is applied and the entry stored under the exclusive write lock.
-         * The function must not recurse into this cache (see getCacheRecursive).
+         * Locked variant: probes under the read lock, then computes the value
+         * with the function while holding the write lock, so the function runs
+         * exactly once per key; it must not call back into this cache.
          */
-        private V getCache(final K k, final int hash, int mix, Function<? super K, ? extends V> createFunction) {
-            long stamp = tryOptimisticRead();
-            if (validate(stamp)) {
+        private V getCache(final K k, final int hash, int mix,
+                           Function<? super K, ? extends V> createFunction) {
+            long stamp = readLock();
+            try {
                 Node<K, V> curr = table[mix & mask];
                 while (curr != null) {
                     if (curr.hash == hash && (k == curr.key || strategy.equals(k, curr.key))) {
-                        V v = curr.value;
-                        if (validate(stamp)) {
-                            return v;
-                        }
-                        break;
+                        return curr.value;
                     }
                     curr = curr.next;
                 }
+            } finally {
+                unlockRead(stamp);
             }
             stamp = writeLock();
             try {
@@ -208,28 +188,14 @@ public final class CustomHashCache<K, V> implements MapCache<K, V> {
         }
 
         /**
-         * Recursive variant: probes optimistically, then runs the function with
+         * Recursive variant: probes under the read lock, runs the function with
          * every lock released so it may call back into this cache, and finally
          * stores the result under the write lock, keeping the value computed by
          * another thread if one landed first.
          */
         private V getCacheRecursive(final K k, final int hash, int mix,
                                     Function<? super K, ? extends V> createFunction) {
-            long stamp = tryOptimisticRead();
-            if (validate(stamp)) {
-                Node<K, V> curr = table[mix & mask];
-                while (curr != null) {
-                    if (curr.hash == hash && (k == curr.key || strategy.equals(k, curr.key))) {
-                        V v = curr.value;
-                        if (validate(stamp)) {
-                            return v;
-                        }
-                        break;
-                    }
-                    curr = curr.next;
-                }
-            }
-            stamp = readLock();
+            long stamp = readLock();
             try {
                 Node<K, V> curr = table[mix & mask];
                 while (curr != null) {
@@ -241,19 +207,15 @@ public final class CustomHashCache<K, V> implements MapCache<K, V> {
             } finally {
                 unlockRead(stamp);
             }
-            // run outside every lock so the function may recursively call back into this cache
+            // Run outside all locks so the function may call back into this cache.
             final var v = createFunction.apply(k);
-            if (v == null) {
-                return null;
-            }
             stamp = writeLock();
             try {
                 final int index = mix & mask;
                 final Node<K, V> node = table[index];
-                Node<K, V> curr = node;
+                Node<K, V> curr = table[index];
                 while (curr != null) {
                     if (curr.hash == hash && (k == curr.key || strategy.equals(k, curr.key))) {
-                        // another thread computed and inserted a value first
                         return curr.value;
                     }
                     curr = curr.next;
@@ -270,24 +232,7 @@ public final class CustomHashCache<K, V> implements MapCache<K, V> {
 
         /** Read-only lookup; never stores anything. */
         private V getIfAbsent(final K k, final int hash, int mix) {
-            long stamp = tryOptimisticRead();
-            if (validate(stamp)) {
-                Node<K, V> curr = table[mix & mask];
-                while (curr != null) {
-                    if (curr.hash == hash && (k == curr.key || strategy.equals(k, curr.key))) {
-                        V v = curr.value;
-                        if (validate(stamp)) {
-                            return v;
-                        }
-                        break;
-                    }
-                    curr = curr.next;
-                }
-                if (validate(stamp)) {
-                    return null;
-                }
-            }
-            stamp = readLock();
+            long stamp = readLock();
             try {
                 final int index = mix & mask;
                 Node<K, V> curr = table[index];
@@ -305,21 +250,7 @@ public final class CustomHashCache<K, V> implements MapCache<K, V> {
 
         /** Inserts only if absent, returning the value now bound to the key. */
         private V put(final K k, final V v, final int hash, int mix) {
-            long stamp = tryOptimisticRead();
-            if (validate(stamp)) {
-                Node<K, V> curr = table[mix & mask];
-                while (curr != null) {
-                    if (curr.hash == hash && (k == curr.key || strategy.equals(k, curr.key))) {
-                        V old = curr.value;
-                        if (validate(stamp)) {
-                            return old;
-                        }
-                        break;
-                    }
-                    curr = curr.next;
-                }
-            }
-            stamp = writeLock();
+           long stamp = writeLock();
             try {
                 final int index = mix & mask;
                 final Node<K, V> node = table[index];
@@ -339,72 +270,10 @@ public final class CustomHashCache<K, V> implements MapCache<K, V> {
                 unlockWrite(stamp);
             }
         }
-
-        /** Doubles the table and rehashes every chain; called with the write lock held. */
-        @SuppressWarnings("unchecked")
-        private void resize() {
-            Node<K, V>[] oldTab = table;
-            int oldCap = oldTab.length;
-            int newCap = oldCap << 1;
-            Node<K, V>[] newTab = new Node[newCap];
-            int newMask = newCap - 1;
-            for (int i = 0; i < oldCap; ++i) {
-                Node<K, V> e;
-                if ((e = oldTab[i]) != null) {
-                    oldTab[i] = null;
-                    if (e.next == null) {
-                        newTab[HashCommon.mix(e.hash) & newMask] = e;
-                    } else {
-                        Node<K, V> loHead = null, loTail = null;
-                        Node<K, V> hiHead = null, hiTail = null;
-                        Node<K, V> next;
-                        do {
-                            next = e.next;
-                            if ((HashCommon.mix(e.hash) & oldCap) == 0) {
-                                if (loTail == null)
-                                    loHead = e;
-                                else
-                                    loTail.next = e;
-                                loTail = e;
-                            } else {
-                                if (hiTail == null)
-                                    hiHead = e;
-                                else
-                                    hiTail.next = e;
-                                hiTail = e;
-                            }
-                        } while ((e = next) != null);
-                        if (loTail != null) {
-                            loTail.next = null;
-                            newTab[HashCommon.mix(loHead.hash) & newMask] = loHead;
-                        }
-                        if (hiTail != null) {
-                            hiTail.next = null;
-                            newTab[HashCommon.mix(hiHead.hash) & newMask] = hiHead;
-                        }
-                    }
-                }
-            }
-            table = newTab;
-            mask = newMask;
-            maxFill = (int) (newCap * Hash.DEFAULT_LOAD_FACTOR);
-        }
-
-        /** Empties the table under the write lock. */
-        private void clear() {
-            long stamp = writeLock();
-            try {
-                if (size == 0) return;
-                size = 0;
-                Arrays.fill(table, null);
-            } finally {
-                unlockWrite(stamp);
-            }
-        }
     }
 
     /** A single entry in a chain; immutable except for {@code next}. */
-    private static final class Node<K, V> {
+    static final class Node<K, V> implements ChainNode<Node<K, V>> {
 
         private final K key;
         private final V value;
@@ -415,6 +284,16 @@ public final class CustomHashCache<K, V> implements MapCache<K, V> {
             this.key = key;
             this.value = value;
             this.hash = hash;
+            this.next = next;
+        }
+
+        @Override
+        public Node<K, V> getNext() {
+            return next;
+        }
+
+        @Override
+        public void setNext(Node<K, V> next) {
             this.next = next;
         }
     }

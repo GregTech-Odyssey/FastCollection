@@ -30,10 +30,8 @@ public final class HashCache<K, V> implements MapCache<K, V> {
 
     /**
      * Creates a cache using {@code createFunction} for the no-argument
-     * {@link #getCache(Object)} / {@link #getCacheRecursive(Object)} methods.
-     * Must not be {@code null}.
-     *
-     * @throws NullPointerException if {@code createFunction} is {@code null}
+     * {@link #getCache(Object)} / {@link #getCacheRecursive(Object)} methods;
+     * {@code null} is allowed and behaves like the no-factory constructor.
      */
     public HashCache(Function<? super K, ? extends V> createFunction) {
         this.map = new ConcurrentHashMap<>();
@@ -71,9 +69,6 @@ public final class HashCache<K, V> implements MapCache<K, V> {
         }
         // Run outside the map so the function may call back into this cache.
         v = createFunction.apply(k);
-        if (v == null) {
-            return null;
-        }
         V prev = map.putIfAbsent(k, v);
         return prev == null ? v : prev;
     }

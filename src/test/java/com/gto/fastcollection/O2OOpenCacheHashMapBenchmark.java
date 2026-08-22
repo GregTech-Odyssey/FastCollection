@@ -1,5 +1,6 @@
 package com.gto.fastcollection;
 
+import com.gto.fastcollection.fastutil.O2OOpenCacheHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;

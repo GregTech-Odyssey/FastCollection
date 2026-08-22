@@ -1,7 +1,7 @@
-package com.gto.fastcollection;
+package com.gto.fastcollection.fastutil;
 
 import it.unimi.dsi.fastutil.HashCommon;
-import it.unimi.dsi.fastutil.bytes.*;
+import it.unimi.dsi.fastutil.shorts.*;
 import it.unimi.dsi.fastutil.objects.*;
 
 import java.util.Arrays;
@@ -13,56 +13,56 @@ import java.util.function.ToIntFunction;
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 import static it.unimi.dsi.fastutil.HashCommon.maxFill;
 
-public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
+public final class O2SOpenCustomCacheHashMap<K> extends Object2ShortOpenCustomHashMap<K> {
 
     private int[] hash;
 
-    public O2BOpenCacheHashMap(final int expected, final float f) {
-        super(expected, f);
+    public O2SOpenCustomCacheHashMap(final int expected, final float f, final Strategy<? super K> strategy) {
+        super(expected, f, strategy);
         hash = new int[n + 1];
     }
 
-    public O2BOpenCacheHashMap(final int expected) {
-        super(expected, DEFAULT_LOAD_FACTOR);
+    public O2SOpenCustomCacheHashMap(final int expected, final Strategy<? super K> strategy) {
+        super(expected, DEFAULT_LOAD_FACTOR, strategy);
         hash = new int[n + 1];
     }
 
-    public O2BOpenCacheHashMap() {
-        super(DEFAULT_INITIAL_SIZE, DEFAULT_LOAD_FACTOR);
+    public O2SOpenCustomCacheHashMap(final Strategy<? super K> strategy) {
+        super(DEFAULT_INITIAL_SIZE, DEFAULT_LOAD_FACTOR, strategy);
         hash = new int[n + 1];
     }
 
-    public O2BOpenCacheHashMap(final Map<? extends K, ? extends Byte> m, final float f) {
-        super(m.size(), f);
-        hash = new int[n + 1];
-        putAll(m);
-    }
-
-    public O2BOpenCacheHashMap(final Map<? extends K, ? extends Byte> m) {
-        this(m, DEFAULT_LOAD_FACTOR);
-    }
-
-    public O2BOpenCacheHashMap(final Object2ByteMap<K> m, final float f) {
-        super(m.size(), f);
+    public O2SOpenCustomCacheHashMap(final Map<? extends K, ? extends Short> m, final float f, final Strategy<? super K> strategy) {
+        super(m.size(), f, strategy);
         hash = new int[n + 1];
         putAll(m);
     }
 
-    public O2BOpenCacheHashMap(final Object2ByteMap<K> m) {
-        this(m, DEFAULT_LOAD_FACTOR);
+    public O2SOpenCustomCacheHashMap(final Map<? extends K, ? extends Short> m, final Strategy<? super K> strategy) {
+        this(m, DEFAULT_LOAD_FACTOR, strategy);
+    }
+
+    public O2SOpenCustomCacheHashMap(final Object2ShortMap<K> m, final float f, final Strategy<? super K> strategy) {
+        super(m.size(), f, strategy);
+        hash = new int[n + 1];
+        putAll(m);
+    }
+
+    public O2SOpenCustomCacheHashMap(final Object2ShortMap<K> m, final Strategy<? super K> strategy) {
+        this(m, DEFAULT_LOAD_FACTOR, strategy);
     }
 
     private int realSize() {
         return containsNullKey ? size - 1 : size;
     }
 
-    private byte removeEntry(int pos) {
-        final byte oldValue = value[pos];
+    private short removeEntry(int pos) {
+        final short oldValue = value[pos];
         size--;
         int last, slot, ch;
         K curr;
         final K[] key = this.key;
-        final byte[] value = this.value;
+        final short[] value = this.value;
         final int[] hash = this.hash;
         final int mask = this.mask;
         a:
@@ -88,11 +88,11 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
         return oldValue;
     }
 
-    private byte removeNullEntry() {
+    private short removeNullEntry() {
         containsNullKey = false;
         key[n] = null;
         hash[n] = 0;
-        final byte oldValue = value[n];
+        final short oldValue = value[n];
         size--;
         if (n > minN && size < maxFill / 4 && n > DEFAULT_INITIAL_SIZE) rehash(n / 2);
         return oldValue;
@@ -105,14 +105,14 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
         final int mask = this.mask;
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return -(pos + 1);
-        if (hash[pos] == h && k.equals(curr)) return pos;
+        if (hash[pos] == h && strategy.equals(k, curr)) return pos;
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return -(pos + 1);
-            if (hash[pos] == h && k.equals(curr)) return pos;
+            if (hash[pos] == h && strategy.equals(k, curr)) return pos;
         }
     }
 
-    private void insert(final int pos, final K k, final byte v, final int h) {
+    private void insert(final int pos, final K k, final short v, final int h) {
         if (pos == n) containsNullKey = true;
         key[pos] = k;
         value[pos] = v;
@@ -121,132 +121,136 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
     }
 
     @Override
-    public byte put(final K k, final byte v) {
+    public short put(final K k, final short v) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            h = k.hashCode();
+            h = strategy.hashCode(k);
             pos = find(k, h);
         }
         if (pos < 0) {
             insert(-pos - 1, k, v, h);
             return defRetValue;
         }
-        final byte oldValue = value[pos];
+        final short oldValue = value[pos];
         value[pos] = v;
         return oldValue;
     }
 
-    private byte addToValue(final int pos, final byte incr) {
-        final byte oldValue = value[pos];
-        value[pos] = (byte)(oldValue + incr);
+    private short addToValue(final int pos, final short incr) {
+        final short oldValue = value[pos];
+        value[pos] = (short)(oldValue + incr);
         return oldValue;
     }
 
     @Override
-    public byte addTo(final K k, final byte incr) {
+    public short addTo(final K k, final short incr) {
         int pos, h = 0;
         if (k == null) {
             if (containsNullKey) return addToValue(n, incr);
             pos = n;
             containsNullKey = true;
         } else {
-            h = k.hashCode();
+            h = strategy.hashCode(k);
             K curr;
             final K[] key = this.key;
             final int[] hash = this.hash;
             final int mask = this.mask;
             if ((curr = key[pos = HashCommon.mix(h) & mask]) != null) {
-                do if (hash[pos] == h && curr.equals(k)) return addToValue(pos, incr);
+                do if (hash[pos] == h && strategy.equals(k, curr)) return addToValue(pos, incr);
                 while ((curr = key[pos = (pos + 1) & mask]) != null);
             }
         }
         key[pos] = k;
         hash[pos] = h;
-        value[pos] = (byte)(defRetValue + incr);
+        value[pos] = (short)(defRetValue + incr);
         if (size++ >= maxFill) rehash(arraySize(size + 1, f));
         return defRetValue;
     }
 
     @Override
-    public byte removeByte(final Object k) {
+    public short removeShort(final Object k) {
         if (k == null) {
             if (containsNullKey) return removeNullEntry();
             return defRetValue;
         }
         K curr;
+        K fk = (K) k;
         final K[] key = this.key;
         final int[] hash = this.hash;
         final int mask = this.mask;
-        final int h = k.hashCode();
+        final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defRetValue;
-        if (hash[pos] == h && k.equals(curr)) return removeEntry(pos);
+        if (hash[pos] == h && strategy.equals(fk, curr)) return removeEntry(pos);
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return defRetValue;
-            if (hash[pos] == h && k.equals(curr)) return removeEntry(pos);
+            if (hash[pos] == h && strategy.equals(fk, curr)) return removeEntry(pos);
         }
     }
 
     @Override
-    public byte getByte(final Object k) {
+    public short getShort(final Object k) {
         if (k == null) return containsNullKey ? value[n] : defRetValue;
+        K fk = (K) k;
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
         final int mask = this.mask;
-        final int h = k.hashCode();
+        final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defRetValue;
-        if (hash[pos] == h && k.equals(curr)) return value[pos];
+        if (hash[pos] == h && strategy.equals(fk, curr)) return value[pos];
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return defRetValue;
-            if (hash[pos] == h && k.equals(curr)) return value[pos];
+            if (hash[pos] == h && strategy.equals(fk, curr)) return value[pos];
         }
     }
 
     @Override
     public boolean containsKey(final Object k) {
         if (k == null) return containsNullKey;
+        K fk = (K) k;
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
         final int mask = this.mask;
-        final int h = k.hashCode();
+        final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
-        if (hash[pos] == h && k.equals(curr)) return true;
+        if (hash[pos] == h && strategy.equals(fk, curr)) return true;
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return false;
-            if (hash[pos] == h && k.equals(curr)) return true;
+            if (hash[pos] == h && strategy.equals(fk, curr)) return true;
         }
     }
 
     @Override
-    public byte getOrDefault(final Object k, final byte defaultValue) {
+    public short getOrDefault(final Object k, final short defaultValue) {
         if (k == null) return containsNullKey ? value[n] : defaultValue;
+        K fk = (K) k;
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
         final int mask = this.mask;
-        final int h = k.hashCode();
+        final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defaultValue;
-        if (hash[pos] == h && k.equals(curr)) return value[pos];
+        if (hash[pos] == h && strategy.equals(fk, curr)) return value[pos];
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return defaultValue;
-            if (hash[pos] == h && k.equals(curr)) return value[pos];
+            if (hash[pos] == h && strategy.equals(fk, curr)) return value[pos];
         }
     }
 
     @Override
-    public byte putIfAbsent(final K k, final byte v) {
+    public short putIfAbsent(final K k, final short v) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            h = k.hashCode();
+            h = strategy.hashCode(k);
             pos = find(k, h);
         }
         if (pos >= 0) return value[pos];
@@ -255,7 +259,7 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
     }
 
     @Override
-    public boolean remove(final Object k, final byte v) {
+    public boolean remove(final Object k, final short v) {
         if (k == null) {
             if (containsNullKey && v == value[n]) {
                 removeNullEntry();
@@ -263,20 +267,21 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
             }
             return false;
         }
+        K fk = (K) k;
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
         final int mask = this.mask;
-        final int h = k.hashCode();
+        final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
-        if (hash[pos] == h && k.equals(curr) && v == value[pos]) {
+        if (hash[pos] == h && strategy.equals(fk, curr) && v == value[pos]) {
             removeEntry(pos);
             return true;
         }
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return false;
-            if (hash[pos] == h && k.equals(curr) && v == value[pos]) {
+            if (hash[pos] == h && strategy.equals(fk, curr) && v == value[pos]) {
                 removeEntry(pos);
                 return true;
             }
@@ -284,12 +289,12 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
     }
 
     @Override
-    public boolean replace(final K k, final byte oldValue, final byte v) {
+    public boolean replace(final K k, final short oldValue, final short v) {
         int pos;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            int h = k.hashCode();
+            int h = strategy.hashCode(k);
             pos = find(k, h);
         }
         if (pos < 0 || oldValue != value[pos]) return false;
@@ -298,62 +303,62 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
     }
 
     @Override
-    public byte replace(final K k, final byte v) {
+    public short replace(final K k, final short v) {
         int pos;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            int h = k.hashCode();
+            int h = strategy.hashCode(k);
             pos = find(k, h);
         }
         if (pos < 0) return defRetValue;
-        final byte oldValue = value[pos];
+        final short oldValue = value[pos];
         value[pos] = v;
         return oldValue;
     }
 
     @Override
-    public byte computeIfAbsent(final K k, final ToIntFunction<? super K> mappingFunction) {
+    public short computeIfAbsent(final K k, final ToIntFunction<? super K> mappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            h = k.hashCode();
+            h = strategy.hashCode(k);
             pos = find(k, h);
         }
         if (pos >= 0) return value[pos];
-        final byte newValue = it.unimi.dsi.fastutil.SafeMath.safeIntToByte(mappingFunction.applyAsInt(k));
+        final short newValue = it.unimi.dsi.fastutil.SafeMath.safeIntToShort(mappingFunction.applyAsInt(k));
         insert(-pos - 1, k, newValue, h);
         return newValue;
     }
 
     @Override
-    public byte computeIfAbsent(final K k, final Object2ByteFunction<? super K> mappingFunction) {
+    public short computeIfAbsent(final K k, final Object2ShortFunction<? super K> mappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            h = k.hashCode();
+            h = strategy.hashCode(k);
             pos = find(k, h);
         }
         if (pos >= 0) return value[pos];
         if (!mappingFunction.containsKey(key)) return defRetValue;
-        final byte newValue = mappingFunction.getByte(k);
+        final short newValue = mappingFunction.getShort(k);
         insert(-pos - 1, k, newValue, h);
         return newValue;
     }
 
     @Override
-    public byte computeByteIfPresent(final K k, final BiFunction<? super K, ? super Byte, ? extends Byte> remappingFunction) {
+    public short computeShortIfPresent(final K k, final BiFunction<? super K, ? super Short, ? extends Short> remappingFunction) {
         int pos;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            int h = k.hashCode();
+            int h = strategy.hashCode(k);
             pos = find(k, h);
         }
         if (pos < 0) return defRetValue;
-        final Byte newValue = remappingFunction.apply((k), Byte.valueOf(value[pos]));
+        final Short newValue = remappingFunction.apply((k), Short.valueOf(value[pos]));
         if (newValue == null) {
             if (k == null) removeNullEntry();
             else removeEntry(pos);
@@ -363,15 +368,15 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
     }
 
     @Override
-    public byte computeByte(final K k, final BiFunction<? super K, ? super Byte, ? extends Byte> remappingFunction) {
+    public short computeShort(final K k, final BiFunction<? super K, ? super Short, ? extends Short> remappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            h = k.hashCode();
+            h = strategy.hashCode(k);
             pos = find(k, h);
         }
-        final Byte newValue = remappingFunction.apply((k), pos >= 0 ? Byte.valueOf(value[pos]) : null);
+        final Short newValue = remappingFunction.apply((k), pos >= 0 ? Short.valueOf(value[pos]) : null);
         if (newValue == null) {
             if (pos >= 0) {
                 if (k == null) removeNullEntry();
@@ -379,7 +384,7 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
             }
             return defRetValue;
         }
-        byte newVal = newValue;
+        short newVal = newValue;
         if (pos < 0) {
             insert(-pos - 1, k, newVal, h);
             return newVal;
@@ -389,36 +394,36 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
 
     /** {@inheritDoc} */
     @Override
-    public byte mergeByte(final K k, final byte v, it.unimi.dsi.fastutil.bytes.ByteBinaryOperator remappingFunction) {
+    public short mergeShort(final K k, final short v, it.unimi.dsi.fastutil.shorts.ShortBinaryOperator remappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            h = k.hashCode();
+            h = strategy.hashCode(k);
             pos = find(k, h);
         }
         if (pos < 0) {
             insert(-pos - 1, k, v, h);
             return v;
         }
-        final byte newValue = remappingFunction.apply(value[pos], v);
+        final short newValue = remappingFunction.apply(value[pos], v);
         return value[pos] = newValue;
     }
 
     @Override
-    public byte merge(final K k, final byte v, final BiFunction<? super Byte, ? super Byte, ? extends Byte> remappingFunction) {
+    public short merge(final K k, final short v, final BiFunction<? super Short, ? super Short, ? extends Short> remappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            h = k.hashCode();
+            h = strategy.hashCode(k);
             pos = find(k, h);
         }
         if (pos < 0) {
             insert(-pos - 1, k, v, h);
             return v;
         }
-        final Byte newValue = remappingFunction.apply(Byte.valueOf(value[pos]), Byte.valueOf(v));
+        final Short newValue = remappingFunction.apply(Short.valueOf(value[pos]), Short.valueOf(v));
         if (newValue == null) {
             if (k == null) removeNullEntry();
             else removeEntry(pos);
@@ -436,7 +441,7 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
         Arrays.fill(hash, 0);
     }
 
-    final class MapEntry implements Entry<K>, ObjectBytePair<K> {
+    final class MapEntry implements Entry<K>, ObjectShortPair<K> {
 
         int index;
 
@@ -457,46 +462,46 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
         }
 
         @Override
-        public byte getByteValue() {
+        public short getShortValue() {
             return value[index];
         }
 
         @Override
-        public byte rightByte() {
+        public short rightShort() {
             return value[index];
         }
 
         @Override
-        public byte setValue(final byte v) {
-            final byte oldValue = value[index];
+        public short setValue(final short v) {
+            final short oldValue = value[index];
             value[index] = v;
             return oldValue;
         }
 
         @Override
-        public ObjectBytePair<K> right(final byte v) {
+        public ObjectShortPair<K> right(final short v) {
             value[index] = v;
             return this;
         }
 
         @Deprecated
         @Override
-        public Byte getValue() {
+        public Short getValue() {
             return value[index];
         }
 
         @Deprecated
         @Override
-        public Byte setValue(final Byte v) {
-            return Byte.valueOf(setValue((v).byteValue()));
+        public Short setValue(final Short v) {
+            return Short.valueOf(setValue((v).shortValue()));
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public boolean equals(final Object o) {
             if (!(o instanceof Map.Entry)) return false;
-            Map.Entry<K, Byte> e = (Map.Entry<K, Byte>) o;
-            return java.util.Objects.equals(key[index], (e.getKey())) && ((value[index]) == ((e.getValue()).byteValue()));
+            Map.Entry<K, Short> e = (Map.Entry<K, Short>) o;
+            return strategy.equals(key[index], (e.getKey())) && ((value[index]) == ((e.getValue()).shortValue()));
         }
 
         @Override
@@ -515,7 +520,7 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
         int pos = n;
         int last = -1;
         int c = size;
-        boolean mustReturnNullKey = O2BOpenCacheHashMap.this.containsNullKey;
+        boolean mustReturnNullKey = O2SOpenCustomCacheHashMap.this.containsNullKey;
         ObjectArrayList<K> wrapped;
 
         abstract void acceptOnIndex(final ConsumerType action, final int index);
@@ -530,16 +535,16 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
                 mustReturnNullKey = false;
                 return last = n;
             }
-            final K[] key = O2BOpenCacheHashMap.this.key;
-            final int[] hash = O2BOpenCacheHashMap.this.hash;
-            final int mask = O2BOpenCacheHashMap.this.mask;
+            final K[] key = O2SOpenCustomCacheHashMap.this.key;
+            final int[] hash = O2SOpenCustomCacheHashMap.this.hash;
+            final int mask = O2SOpenCustomCacheHashMap.this.mask;
             for (;;) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
                     final K k = wrapped.get(-pos - 1);
-                    final int h = k.hashCode();
+                    final int h = strategy.hashCode(k);
                     int p = HashCommon.mix(h) & mask;
-                    while (!(hash[p] == h && k.equals(key[p]))) p = (p + 1) & mask;
+                    while (!(hash[p] == h && strategy.equals(key[p], k))) p = (p + 1) & mask;
                     return p;
                 }
                 if (!((key[pos]) == null)) return last = pos;
@@ -552,16 +557,15 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
                 acceptOnIndex(action, last = n);
                 c--;
             }
-            final K[] key = O2BOpenCacheHashMap.this.key;
-            final int[] hash = O2BOpenCacheHashMap.this.hash;
-            final int mask = O2BOpenCacheHashMap.this.mask;
+            final K[] key = O2SOpenCustomCacheHashMap.this.key;
+            final int[] hash = O2SOpenCustomCacheHashMap.this.hash;
             while (c != 0) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
                     final K k = wrapped.get(-pos - 1);
-                    final int h = k.hashCode();
+                    final int h = strategy.hashCode(k);
                     int p = HashCommon.mix(h) & mask;
-                    while (!(hash[p] == h && k.equals(key[p]))) p = (p + 1) & mask;
+                    while (!(hash[p] == h && strategy.equals(key[p], k))) p = (p + 1) & mask;
                     acceptOnIndex(action, p);
                     c--;
                 } else if (!((key[pos]) == null)) {
@@ -574,10 +578,10 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
         private void shiftKeys(int pos) {
             int last, slot, ch;
             K curr;
-            final K[] key = O2BOpenCacheHashMap.this.key;
-            final byte[] value = O2BOpenCacheHashMap.this.value;
-            final int[] hash = O2BOpenCacheHashMap.this.hash;
-            final int mask = O2BOpenCacheHashMap.this.mask;
+            final K[] key = O2SOpenCustomCacheHashMap.this.key;
+            final short[] value = O2SOpenCustomCacheHashMap.this.value;
+            final int[] hash = O2SOpenCustomCacheHashMap.this.hash;
+            final int mask = O2SOpenCustomCacheHashMap.this.mask;
             for (;;) {
                 pos = ((last = pos) + 1) & mask;
                 for (;;) {
@@ -608,7 +612,7 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
                 hash[n] = 0;
             } else if (pos >= 0) shiftKeys(last);
             else {
-                O2BOpenCacheHashMap.this.removeByte(wrapped.set(-pos - 1, null));
+                O2SOpenCustomCacheHashMap.this.removeShort(wrapped.set(-pos - 1, null));
                 last = -1;
                 return;
             }
@@ -666,7 +670,7 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
         int pos = 0;
         int max = n;
         int c = 0;
-        boolean mustReturnNull = O2BOpenCacheHashMap.this.containsNullKey;
+        boolean mustReturnNull = O2SOpenCustomCacheHashMap.this.containsNullKey;
         boolean hasSplit = false;
 
         MapSpliterator() {}
@@ -689,7 +693,7 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
                 acceptOnIndex(action, n);
                 return true;
             }
-            final K[] key = O2BOpenCacheHashMap.this.key;
+            final K[] key = O2SOpenCustomCacheHashMap.this.key;
             while (pos < max) {
                 if (!((key[pos]) == null)) {
                     ++c;
@@ -707,7 +711,7 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
                 ++c;
                 acceptOnIndex(action, n);
             }
-            final K[] key = O2BOpenCacheHashMap.this.key;
+            final K[] key = O2SOpenCustomCacheHashMap.this.key;
             while (pos < max) {
                 if (!((key[pos]) == null)) {
                     acceptOnIndex(action, pos);
@@ -746,7 +750,7 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
                 ++skipped;
                 --n;
             }
-            final K[] key = O2BOpenCacheHashMap.this.key;
+            final K[] key = O2SOpenCustomCacheHashMap.this.key;
             while (pos < max && n > 0) {
                 if (!((key[pos++]) == null)) {
                     ++skipped;
@@ -805,19 +809,19 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
         public boolean contains(final Object o) {
             if (!(o instanceof Map.Entry)) return false;
             final Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
-            if (e.getValue() == null || !(e.getValue() instanceof Byte)) return false;
+            if (e.getValue() == null || !(e.getValue() instanceof Short)) return false;
             final K k = ((K) e.getKey());
-            final byte v = ((Byte) (e.getValue())).byteValue();
-            if (((k) == null)) return O2BOpenCacheHashMap.this.containsNullKey && ((value[n]) == (v));
+            final short v = ((Short) (e.getValue())).shortValue();
+            if (((k) == null)) return O2SOpenCustomCacheHashMap.this.containsNullKey && ((value[n]) == (v));
             K curr;
-            final K[] key = O2BOpenCacheHashMap.this.key;
-            final int mask = O2BOpenCacheHashMap.this.mask;
+            final K[] key = O2SOpenCustomCacheHashMap.this.key;
+            final int mask = O2SOpenCustomCacheHashMap.this.mask;
             int pos;
-            if (((curr = key[pos = (HashCommon.mix((k).hashCode())) & mask]) == null)) return false;
-            if (((k).equals(curr))) return ((value[pos]) == (v));
+            if (((curr = key[pos = (HashCommon.mix(strategy.hashCode(k))) & mask]) == null)) return false;
+            if (strategy.equals(k, curr)) return ((value[pos]) == (v));
             while (true) {
                 if (((curr = key[pos = (pos + 1) & mask]) == null)) return false;
-                if (((k).equals(curr))) return ((value[pos]) == (v));
+                if (strategy.equals(k, curr)) return ((value[pos]) == (v));
             }
         }
 
@@ -826,9 +830,9 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
         public boolean remove(final Object o) {
             if (!(o instanceof Map.Entry)) return false;
             final Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
-            if (e.getValue() == null || !(e.getValue() instanceof Byte)) return false;
+            if (e.getValue() == null || !(e.getValue() instanceof Short)) return false;
             final K k = ((K) e.getKey());
-            final byte v = ((Byte) (e.getValue())).byteValue();
+            final short v = ((Short) (e.getValue())).shortValue();
             if (((k) == null)) {
                 if (containsNullKey && ((value[n]) == (v))) {
                     removeNullEntry();
@@ -837,11 +841,11 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
                 return false;
             }
             K curr;
-            final K[] key = O2BOpenCacheHashMap.this.key;
-            final int mask = O2BOpenCacheHashMap.this.mask;
+            final K[] key = O2SOpenCustomCacheHashMap.this.key;
+            final int mask = O2SOpenCustomCacheHashMap.this.mask;
             int pos;
-            if (((curr = key[pos = (HashCommon.mix((k).hashCode())) & mask]) == null)) return false;
-            if (((curr).equals(k))) {
+            if (((curr = key[pos = (HashCommon.mix(strategy.hashCode(k))) & mask]) == null)) return false;
+            if (strategy.equals(k, curr)) {
                 if (((value[pos]) == (v))) {
                     removeEntry(pos);
                     return true;
@@ -850,7 +854,7 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
             }
             while (true) {
                 if (((curr = key[pos = (pos + 1) & mask]) == null)) return false;
-                if (((curr).equals(k))) {
+                if (strategy.equals(k, curr)) {
                     if (((value[pos]) == (v))) {
                         removeEntry(pos);
                         return true;
@@ -866,13 +870,13 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
 
         @Override
         public void clear() {
-            O2BOpenCacheHashMap.this.clear();
+            O2SOpenCustomCacheHashMap.this.clear();
         }
 
         @Override
         public void forEach(final Consumer<? super Entry<K>> consumer) {
             if (containsNullKey) consumer.accept(new MapEntry(n));
-            final K[] key = O2BOpenCacheHashMap.this.key;
+            final K[] key = O2SOpenCustomCacheHashMap.this.key;
             for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) consumer.accept(new MapEntry(pos));
         }
 
@@ -884,7 +888,7 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
                 entry.index = n;
                 consumer.accept(entry);
             }
-            final K[] key = O2BOpenCacheHashMap.this.key;
+            final K[] key = O2SOpenCustomCacheHashMap.this.key;
             for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) {
                 entry.index = pos;
                 consumer.accept(entry);
@@ -893,7 +897,7 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
     }
 
     @Override
-    public FastEntrySet<K> object2ByteEntrySet() {
+    public FastEntrySet<K> object2ShortEntrySet() {
         if (entries == null) entries = new MapEntrySet();
         return entries;
     }
@@ -956,7 +960,7 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
         /** {@inheritDoc} */
         @Override
         public void forEach(final Consumer<? super K> consumer) {
-            final K[] key = O2BOpenCacheHashMap.this.key;
+            final K[] key = O2SOpenCustomCacheHashMap.this.key;
             if (containsNullKey) consumer.accept(key[n]);
             for (int pos = n; pos-- != 0;) {
                 final K k = key[pos];
@@ -977,13 +981,13 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
         @Override
         public boolean remove(Object k) {
             final int oldSize = size;
-            O2BOpenCacheHashMap.this.removeByte(k);
+            O2SOpenCustomCacheHashMap.this.removeShort(k);
             return size != oldSize;
         }
 
         @Override
         public void clear() {
-            O2BOpenCacheHashMap.this.clear();
+            O2SOpenCustomCacheHashMap.this.clear();
         }
     }
 
@@ -993,26 +997,26 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
         return keys;
     }
 
-    private final class ValueIterator extends MapIterator<ByteConsumer> implements ByteIterator {
+    private final class ValueIterator extends MapIterator<ShortConsumer> implements ShortIterator {
 
         public ValueIterator() {
             super();
         }
 
         @Override
-        void acceptOnIndex(final ByteConsumer action, final int index) {
+        void acceptOnIndex(final ShortConsumer action, final int index) {
             action.accept(value[index]);
         }
 
         @Override
-        public byte nextByte() {
+        public short nextShort() {
             return value[nextEntry()];
         }
     }
 
-    private final class ValueSpliterator extends MapSpliterator<ByteConsumer, ValueSpliterator> implements ByteSpliterator {
+    private final class ValueSpliterator extends MapSpliterator<ShortConsumer, ValueSpliterator> implements ShortSpliterator {
 
-        private static final int POST_SPLIT_CHARACTERISTICS = ByteSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
+        private static final int POST_SPLIT_CHARACTERISTICS = ShortSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
 
         ValueSpliterator() {}
 
@@ -1022,11 +1026,11 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
 
         @Override
         public int characteristics() {
-            return hasSplit ? POST_SPLIT_CHARACTERISTICS : ByteSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS;
+            return hasSplit ? POST_SPLIT_CHARACTERISTICS : ShortSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS;
         }
 
         @Override
-        void acceptOnIndex(final ByteConsumer action, final int index) {
+        void acceptOnIndex(final ShortConsumer action, final int index) {
             action.accept(value[index]);
         }
 
@@ -1037,24 +1041,24 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
     }
 
     @Override
-    public ByteCollection values() {
-        if (values == null) values = new AbstractByteCollection() {
+    public ShortCollection values() {
+        if (values == null) values = new AbstractShortCollection() {
 
             @Override
-            public ByteIterator iterator() {
+            public ShortIterator iterator() {
                 return new ValueIterator();
             }
 
             @Override
-            public ByteSpliterator spliterator() {
+            public ShortSpliterator spliterator() {
                 return new ValueSpliterator();
             }
 
             /** {@inheritDoc} */
             @Override
-            public void forEach(final ByteConsumer consumer) {
-                final K[] key = O2BOpenCacheHashMap.this.key;
-                final byte[] value = O2BOpenCacheHashMap.this.value;
+            public void forEach(final ShortConsumer consumer) {
+                final K[] key = O2SOpenCustomCacheHashMap.this.key;
+                final short[] value = O2SOpenCustomCacheHashMap.this.value;
                 if (containsNullKey) consumer.accept(value[n]);
                 for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) consumer.accept(value[pos]);
             }
@@ -1065,13 +1069,13 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
             }
 
             @Override
-            public boolean contains(byte v) {
+            public boolean contains(short v) {
                 return containsValue(v);
             }
 
             @Override
             public void clear() {
-                O2BOpenCacheHashMap.this.clear();
+                O2SOpenCustomCacheHashMap.this.clear();
             }
         };
         return values;
@@ -1080,11 +1084,11 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
     @SuppressWarnings("unchecked")
     protected void rehash(final int newN) {
         final K[] key = this.key;
-        final byte[] value = this.value;
+        final short[] value = this.value;
         final int[] hash = this.hash;
         final int mask = newN - 1;
         final K[] newKey = (K[]) new Object[newN + 1];
-        final byte[] newValue = new byte[newN + 1];
+        final short[] newValue = new short[newN + 1];
         final int[] newHash = new int[newN + 1];
         int i = n, pos, h;
         for (int j = realSize(); j-- != 0;) {
@@ -1104,8 +1108,8 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
     }
 
     @Override
-    public O2BOpenCacheHashMap<K> clone() {
-        O2BOpenCacheHashMap<K> c = (O2BOpenCacheHashMap<K>) super.clone();
+    public O2SOpenCustomCacheHashMap<K> clone() {
+        O2SOpenCustomCacheHashMap<K> c = (O2SOpenCustomCacheHashMap<K>) super.clone();
         c.hash = hash.clone();
         return c;
     }
@@ -1114,7 +1118,7 @@ public final class O2BOpenCacheHashMap<K> extends Object2ByteOpenHashMap<K> {
     public int hashCode() {
         int h = 0;
         final K[] key = this.key;
-        final byte[] value = this.value;
+        final short[] value = this.value;
         final int[] hash = this.hash;
         for (int j = realSize(), i = 0, t = 0; j-- != 0;) {
             while (((key[i]) == null)) i++;

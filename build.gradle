@@ -6,7 +6,7 @@ plugins {
 }
 
 group = 'com.gto.fastcollection'
-version = '26.8.1'
+version = '26.8.2'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
@@ -39,7 +39,7 @@ tasks.register('jmh', JavaExec) {
     description = 'Runs the JMH benchmarks with their configured forks/iterations'
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'com.gto.fastcollection.cache.BenchmarkRunner'
-    args = [providers.gradleProperty('benchmark').orElse('.*').get()]
+    args = [providers.gradleProperty('benchmark').orElse('.*').get(), providers.gradleProperty('prof').orElse('').get()]
     // 正式基准较慢，单独运行；不挂到 check/test 上
 }
 

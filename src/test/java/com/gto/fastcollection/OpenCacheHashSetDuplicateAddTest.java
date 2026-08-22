@@ -1,5 +1,6 @@
 package com.gto.fastcollection;
 
+import com.gto.fastcollection.fastutil.OpenCacheHashSet;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;

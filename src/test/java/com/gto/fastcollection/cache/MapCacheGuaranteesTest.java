@@ -6,6 +6,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -24,7 +25,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *   <li>{@link MapCache#getCache(Object, Function)} runs the create function at
  *       most once per key even under contention (unlike the recursive variant);</li>
  *   <li>the no-argument methods require a constructor factory and throw
- *       {@link NullPointerException} without one;</li>
+ *       {@link NullPointerException} without one; an explicit {@code null}
+ *       factory is accepted at construction;</li>
  *   <li>{@link HashCache} rejects a create function that calls back into the
  *       cache (the map's lock is not reentrant);</li>
  *   <li>identity-based caches key by object identity while strategy-based caches
@@ -118,6 +120,31 @@ class MapCacheGuaranteesTest {
         assertThat(cache.getCache("k", k -> "v")).isEqualTo("v");
         assertThat(cache.getIfPresent("k")).isEqualTo("v");
         assertThat(cache.getCacheRecursive("k2", k -> "v2")).isEqualTo("v2");
+    }
+
+    @Test
+    void nullFactoryIsAllowedAtConstruction() {
+        // every factory-taking constructor accepts null: it means "no factory"
+        // and only the no-argument convenience methods fail (at call time)
+        List<MapCache<String, String>> caches = List.of(
+                new HashCache<>(null),
+                new IdentityHashCache<>(null),
+                new CustomHashCache<>(VALUE_STRATEGY, null),
+                new WeakValueHashCache<>(null),
+                new WeakValueIdentityHashCache<>(null),
+                new WeakValueCustomHashCache<>(VALUE_STRATEGY, null));
+
+        for (MapCache<String, String> cache : caches) {
+            assertThatThrownBy(() -> cache.getCache("k"))
+                    .as("getCache(k) with a null factory")
+                    .isInstanceOf(NullPointerException.class);
+            assertThatThrownBy(() -> cache.getCacheRecursive("k"))
+                    .as("getCacheRecursive(k) with a null factory")
+                    .isInstanceOf(NullPointerException.class);
+            // explicit-function methods still work
+            assertThat(cache.getCache("k", k -> "v")).isEqualTo("v");
+            assertThat(cache.getCacheRecursive("k2", k -> "v2")).isEqualTo("v2");
+        }
     }
 
     @Test

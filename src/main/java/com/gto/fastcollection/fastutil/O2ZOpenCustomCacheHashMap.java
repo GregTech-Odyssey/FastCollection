@@ -1,54 +1,53 @@
-package com.gto.fastcollection;
+package com.gto.fastcollection.fastutil;
 
 import it.unimi.dsi.fastutil.HashCommon;
-import it.unimi.dsi.fastutil.doubles.*;
+import it.unimi.dsi.fastutil.booleans.*;
 import it.unimi.dsi.fastutil.objects.*;
 
 import java.util.Arrays;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
-import java.util.function.ToIntFunction;
 
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 import static it.unimi.dsi.fastutil.HashCommon.maxFill;
 
-public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomHashMap<K> {
+public final class O2ZOpenCustomCacheHashMap<K> extends Object2BooleanOpenCustomHashMap<K> {
 
     private int[] hash;
 
-    public O2DOpenCustomCacheHashMap(final int expected, final float f, final Strategy<? super K> strategy) {
+    public O2ZOpenCustomCacheHashMap(final int expected, final float f, final Strategy<? super K> strategy) {
         super(expected, f, strategy);
         hash = new int[n + 1];
     }
 
-    public O2DOpenCustomCacheHashMap(final int expected, final Strategy<? super K> strategy) {
+    public O2ZOpenCustomCacheHashMap(final int expected, final Strategy<? super K> strategy) {
         super(expected, DEFAULT_LOAD_FACTOR, strategy);
         hash = new int[n + 1];
     }
 
-    public O2DOpenCustomCacheHashMap(final Strategy<? super K> strategy) {
+    public O2ZOpenCustomCacheHashMap(final Strategy<? super K> strategy) {
         super(DEFAULT_INITIAL_SIZE, DEFAULT_LOAD_FACTOR, strategy);
         hash = new int[n + 1];
     }
 
-    public O2DOpenCustomCacheHashMap(final Map<? extends K, ? extends Double> m, final float f, final Strategy<? super K> strategy) {
+    public O2ZOpenCustomCacheHashMap(final Map<? extends K, ? extends Boolean> m, final float f, final Strategy<? super K> strategy) {
         super(m.size(), f, strategy);
         hash = new int[n + 1];
         putAll(m);
     }
 
-    public O2DOpenCustomCacheHashMap(final Map<? extends K, ? extends Double> m, final Strategy<? super K> strategy) {
+    public O2ZOpenCustomCacheHashMap(final Map<? extends K, ? extends Boolean> m, final Strategy<? super K> strategy) {
         this(m, DEFAULT_LOAD_FACTOR, strategy);
     }
 
-    public O2DOpenCustomCacheHashMap(final Object2DoubleMap<K> m, final float f, final Strategy<? super K> strategy) {
+    public O2ZOpenCustomCacheHashMap(final Object2BooleanMap<K> m, final float f, final Strategy<? super K> strategy) {
         super(m.size(), f, strategy);
         hash = new int[n + 1];
         putAll(m);
     }
 
-    public O2DOpenCustomCacheHashMap(final Object2DoubleMap<K> m, final Strategy<? super K> strategy) {
+    public O2ZOpenCustomCacheHashMap(final Object2BooleanMap<K> m, final Strategy<? super K> strategy) {
         this(m, DEFAULT_LOAD_FACTOR, strategy);
     }
 
@@ -56,13 +55,13 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         return containsNullKey ? size - 1 : size;
     }
 
-    private double removeEntry(int pos) {
-        final double oldValue = value[pos];
+    private boolean removeEntry(int pos) {
+        final boolean oldValue = value[pos];
         size--;
         int last, slot, ch;
         K curr;
         final K[] key = this.key;
-        final double[] value = this.value;
+        final boolean[] value = this.value;
         final int[] hash = this.hash;
         final int mask = this.mask;
         a:
@@ -71,7 +70,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
             for (;;) {
                 if ((curr = key[pos]) == null) {
                     key[last] = null;
-                    value[last] = 0d;
+                    value[last] = false;
                     hash[last] = 0;
                     break a;
                 }
@@ -88,11 +87,11 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         return oldValue;
     }
 
-    private double removeNullEntry() {
+    private boolean removeNullEntry() {
         containsNullKey = false;
         key[n] = null;
         hash[n] = 0;
-        final double oldValue = value[n];
+        final boolean oldValue = value[n];
         size--;
         if (n > minN && size < maxFill / 4 && n > DEFAULT_INITIAL_SIZE) rehash(n / 2);
         return oldValue;
@@ -112,7 +111,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         }
     }
 
-    private void insert(final int pos, final K k, final double v, final int h) {
+    private void insert(final int pos, final K k, final boolean v, final int h) {
         if (pos == n) containsNullKey = true;
         key[pos] = k;
         value[pos] = v;
@@ -121,7 +120,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
     }
 
     @Override
-    public double put(final K k, final double v) {
+    public boolean put(final K k, final boolean v) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -133,44 +132,15 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
             insert(-pos - 1, k, v, h);
             return defRetValue;
         }
-        final double oldValue = value[pos];
+        final boolean oldValue = value[pos];
         value[pos] = v;
         return oldValue;
     }
 
-    private double addToValue(final int pos, final double incr) {
-        final double oldValue = value[pos];
-        value[pos] = oldValue + incr;
-        return oldValue;
-    }
+
 
     @Override
-    public double addTo(final K k, final double incr) {
-        int pos, h = 0;
-        if (k == null) {
-            if (containsNullKey) return addToValue(n, incr);
-            pos = n;
-            containsNullKey = true;
-        } else {
-            h = strategy.hashCode(k);
-            K curr;
-            final K[] key = this.key;
-            final int[] hash = this.hash;
-            final int mask = this.mask;
-            if ((curr = key[pos = HashCommon.mix(h) & mask]) != null) {
-                do if (hash[pos] == h && strategy.equals(k, curr)) return addToValue(pos, incr);
-                while ((curr = key[pos = (pos + 1) & mask]) != null);
-            }
-        }
-        key[pos] = k;
-        hash[pos] = h;
-        value[pos] = defRetValue + incr;
-        if (size++ >= maxFill) rehash(arraySize(size + 1, f));
-        return defRetValue;
-    }
-
-    @Override
-    public double removeDouble(final Object k) {
+    public boolean removeBoolean(final Object k) {
         if (k == null) {
             if (containsNullKey) return removeNullEntry();
             return defRetValue;
@@ -191,7 +161,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
     }
 
     @Override
-    public double getDouble(final Object k) {
+    public boolean getBoolean(final Object k) {
         if (k == null) return containsNullKey ? value[n] : defRetValue;
         K fk = (K) k;
         K curr;
@@ -227,7 +197,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
     }
 
     @Override
-    public double getOrDefault(final Object k, final double defaultValue) {
+    public boolean getOrDefault(final Object k, final boolean defaultValue) {
         if (k == null) return containsNullKey ? value[n] : defaultValue;
         K fk = (K) k;
         K curr;
@@ -245,7 +215,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
     }
 
     @Override
-    public double putIfAbsent(final K k, final double v) {
+    public boolean putIfAbsent(final K k, final boolean v) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -259,7 +229,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
     }
 
     @Override
-    public boolean remove(final Object k, final double v) {
+    public boolean remove(final Object k, final boolean v) {
         if (k == null) {
             if (containsNullKey && v == value[n]) {
                 removeNullEntry();
@@ -289,7 +259,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
     }
 
     @Override
-    public boolean replace(final K k, final double oldValue, final double v) {
+    public boolean replace(final K k, final boolean oldValue, final boolean v) {
         int pos;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -303,7 +273,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
     }
 
     @Override
-    public double replace(final K k, final double v) {
+    public boolean replace(final K k, final boolean v) {
         int pos;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -312,13 +282,13 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
             pos = find(k, h);
         }
         if (pos < 0) return defRetValue;
-        final double oldValue = value[pos];
+        final boolean oldValue = value[pos];
         value[pos] = v;
         return oldValue;
     }
 
     @Override
-    public double computeIfAbsent(final K k, final java.util.function.ToDoubleFunction<? super K> mappingFunction) {
+    public boolean computeIfAbsent(final K k, final java.util.function.Predicate<? super K> mappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -327,13 +297,13 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
             pos = find(k, h);
         }
         if (pos >= 0) return value[pos];
-        final double newValue = mappingFunction.applyAsDouble(k);
+        final boolean newValue = mappingFunction.test(k);
         insert(-pos - 1, k, newValue, h);
         return newValue;
     }
 
     @Override
-    public double computeIfAbsent(final K k, final Object2DoubleFunction<? super K> mappingFunction) {
+    public boolean computeIfAbsent(final K k, final Object2BooleanFunction<? super K> mappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -343,13 +313,13 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         }
         if (pos >= 0) return value[pos];
         if (!mappingFunction.containsKey(key)) return defRetValue;
-        final double newValue = mappingFunction.getDouble(k);
+        final boolean newValue = mappingFunction.getBoolean(k);
         insert(-pos - 1, k, newValue, h);
         return newValue;
     }
 
     @Override
-    public double computeDoubleIfPresent(final K k, final BiFunction<? super K, ? super Double, ? extends Double> remappingFunction) {
+    public boolean computeBooleanIfPresent(final K k, final BiFunction<? super K, ? super Boolean, ? extends Boolean> remappingFunction) {
         int pos;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -358,7 +328,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
             pos = find(k, h);
         }
         if (pos < 0) return defRetValue;
-        final Double newValue = remappingFunction.apply((k), Double.valueOf(value[pos]));
+        final Boolean newValue = remappingFunction.apply((k), Boolean.valueOf(value[pos]));
         if (newValue == null) {
             if (k == null) removeNullEntry();
             else removeEntry(pos);
@@ -368,7 +338,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
     }
 
     @Override
-    public double computeDouble(final K k, final BiFunction<? super K, ? super Double, ? extends Double> remappingFunction) {
+    public boolean computeBoolean(final K k, final BiFunction<? super K, ? super Boolean, ? extends Boolean> remappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -376,7 +346,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
             h = strategy.hashCode(k);
             pos = find(k, h);
         }
-        final Double newValue = remappingFunction.apply((k), pos >= 0 ? Double.valueOf(value[pos]) : null);
+        final Boolean newValue = remappingFunction.apply((k), pos >= 0 ? Boolean.valueOf(value[pos]) : null);
         if (newValue == null) {
             if (pos >= 0) {
                 if (k == null) removeNullEntry();
@@ -384,7 +354,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
             }
             return defRetValue;
         }
-        double newVal = newValue;
+        boolean newVal = newValue;
         if (pos < 0) {
             insert(-pos - 1, k, newVal, h);
             return newVal;
@@ -392,26 +362,9 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         return value[pos] = newVal;
     }
 
-    /** {@inheritDoc} */
-    @Override
-    public double mergeDouble(final K k, final double v, java.util.function.DoubleBinaryOperator remappingFunction) {
-        int pos, h = 0;
-        if (k == null) {
-            pos = containsNullKey ? n : -(n + 1);
-        } else {
-            h = strategy.hashCode(k);
-            pos = find(k, h);
-        }
-        if (pos < 0) {
-            insert(-pos - 1, k, v, h);
-            return v;
-        }
-        final double newValue = remappingFunction.applyAsDouble(value[pos], v);
-        return value[pos] = newValue;
-    }
 
     @Override
-    public double merge(final K k, final double v, final BiFunction<? super Double, ? super Double, ? extends Double> remappingFunction) {
+    public boolean merge(final K k, final boolean v, final BiFunction<? super Boolean, ? super Boolean, ? extends Boolean> remappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -423,7 +376,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
             insert(-pos - 1, k, v, h);
             return v;
         }
-        final Double newValue = remappingFunction.apply(Double.valueOf(value[pos]), Double.valueOf(v));
+        final Boolean newValue = remappingFunction.apply(Boolean.valueOf(value[pos]), Boolean.valueOf(v));
         if (newValue == null) {
             if (k == null) removeNullEntry();
             else removeEntry(pos);
@@ -441,7 +394,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         Arrays.fill(hash, 0);
     }
 
-    final class MapEntry implements Entry<K>, ObjectDoublePair<K> {
+    final class MapEntry implements Entry<K>, ObjectBooleanPair<K> {
 
         int index;
 
@@ -462,51 +415,51 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         }
 
         @Override
-        public double getDoubleValue() {
+        public boolean getBooleanValue() {
             return value[index];
         }
 
         @Override
-        public double rightDouble() {
+        public boolean rightBoolean() {
             return value[index];
         }
 
         @Override
-        public double setValue(final double v) {
-            final double oldValue = value[index];
+        public boolean setValue(final boolean v) {
+            final boolean oldValue = value[index];
             value[index] = v;
             return oldValue;
         }
 
         @Override
-        public ObjectDoublePair<K> right(final double v) {
+        public ObjectBooleanPair<K> right(final boolean v) {
             value[index] = v;
             return this;
         }
 
         @Deprecated
         @Override
-        public Double getValue() {
+        public Boolean getValue() {
             return value[index];
         }
 
         @Deprecated
         @Override
-        public Double setValue(final Double v) {
-            return Double.valueOf(setValue((v).doubleValue()));
+        public Boolean setValue(final Boolean v) {
+            return Boolean.valueOf(setValue((v).booleanValue()));
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public boolean equals(final Object o) {
             if (!(o instanceof Map.Entry)) return false;
-            Map.Entry<K, Double> e = (Map.Entry<K, Double>) o;
-            return strategy.equals(key[index], (e.getKey())) && (Double.doubleToRawLongBits(value[index]) == Double.doubleToRawLongBits((e.getValue()).doubleValue()));
+            Map.Entry<K, Boolean> e = (Map.Entry<K, Boolean>) o;
+            return strategy.equals(key[index], (e.getKey())) && ((value[index]) == ((e.getValue()).booleanValue()));
         }
 
         @Override
         public int hashCode() {
-            return hash[index] ^ it.unimi.dsi.fastutil.HashCommon.double2int(value[index]);
+            return hash[index] ^ (value[index] ? 1231 : 1237);
         }
 
         @Override
@@ -520,7 +473,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         int pos = n;
         int last = -1;
         int c = size;
-        boolean mustReturnNullKey = O2DOpenCustomCacheHashMap.this.containsNullKey;
+        boolean mustReturnNullKey = O2ZOpenCustomCacheHashMap.this.containsNullKey;
         ObjectArrayList<K> wrapped;
 
         abstract void acceptOnIndex(final ConsumerType action, final int index);
@@ -535,9 +488,9 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
                 mustReturnNullKey = false;
                 return last = n;
             }
-            final K[] key = O2DOpenCustomCacheHashMap.this.key;
-            final int[] hash = O2DOpenCustomCacheHashMap.this.hash;
-            final int mask = O2DOpenCustomCacheHashMap.this.mask;
+            final K[] key = O2ZOpenCustomCacheHashMap.this.key;
+            final int[] hash = O2ZOpenCustomCacheHashMap.this.hash;
+            final int mask = O2ZOpenCustomCacheHashMap.this.mask;
             for (;;) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
@@ -557,8 +510,8 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
                 acceptOnIndex(action, last = n);
                 c--;
             }
-            final K[] key = O2DOpenCustomCacheHashMap.this.key;
-            final int[] hash = O2DOpenCustomCacheHashMap.this.hash;
+            final K[] key = O2ZOpenCustomCacheHashMap.this.key;
+            final int[] hash = O2ZOpenCustomCacheHashMap.this.hash;
             while (c != 0) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
@@ -578,10 +531,10 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         private void shiftKeys(int pos) {
             int last, slot, ch;
             K curr;
-            final K[] key = O2DOpenCustomCacheHashMap.this.key;
-            final double[] value = O2DOpenCustomCacheHashMap.this.value;
-            final int[] hash = O2DOpenCustomCacheHashMap.this.hash;
-            final int mask = O2DOpenCustomCacheHashMap.this.mask;
+            final K[] key = O2ZOpenCustomCacheHashMap.this.key;
+            final boolean[] value = O2ZOpenCustomCacheHashMap.this.value;
+            final int[] hash = O2ZOpenCustomCacheHashMap.this.hash;
+            final int mask = O2ZOpenCustomCacheHashMap.this.mask;
             for (;;) {
                 pos = ((last = pos) + 1) & mask;
                 for (;;) {
@@ -612,7 +565,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
                 hash[n] = 0;
             } else if (pos >= 0) shiftKeys(last);
             else {
-                O2DOpenCustomCacheHashMap.this.removeDouble(wrapped.set(-pos - 1, null));
+                O2ZOpenCustomCacheHashMap.this.removeBoolean(wrapped.set(-pos - 1, null));
                 last = -1;
                 return;
             }
@@ -670,7 +623,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         int pos = 0;
         int max = n;
         int c = 0;
-        boolean mustReturnNull = O2DOpenCustomCacheHashMap.this.containsNullKey;
+        boolean mustReturnNull = O2ZOpenCustomCacheHashMap.this.containsNullKey;
         boolean hasSplit = false;
 
         MapSpliterator() {}
@@ -693,7 +646,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
                 acceptOnIndex(action, n);
                 return true;
             }
-            final K[] key = O2DOpenCustomCacheHashMap.this.key;
+            final K[] key = O2ZOpenCustomCacheHashMap.this.key;
             while (pos < max) {
                 if (!((key[pos]) == null)) {
                     ++c;
@@ -711,7 +664,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
                 ++c;
                 acceptOnIndex(action, n);
             }
-            final K[] key = O2DOpenCustomCacheHashMap.this.key;
+            final K[] key = O2ZOpenCustomCacheHashMap.this.key;
             while (pos < max) {
                 if (!((key[pos]) == null)) {
                     acceptOnIndex(action, pos);
@@ -750,7 +703,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
                 ++skipped;
                 --n;
             }
-            final K[] key = O2DOpenCustomCacheHashMap.this.key;
+            final K[] key = O2ZOpenCustomCacheHashMap.this.key;
             while (pos < max && n > 0) {
                 if (!((key[pos++]) == null)) {
                     ++skipped;
@@ -809,19 +762,19 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         public boolean contains(final Object o) {
             if (!(o instanceof Map.Entry)) return false;
             final Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
-            if (e.getValue() == null || !(e.getValue() instanceof Double)) return false;
+            if (e.getValue() == null || !(e.getValue() instanceof Boolean)) return false;
             final K k = ((K) e.getKey());
-            final double v = ((Double) (e.getValue())).doubleValue();
-            if (((k) == null)) return O2DOpenCustomCacheHashMap.this.containsNullKey && (Double.doubleToRawLongBits(value[n]) == Double.doubleToRawLongBits(v));
+            final boolean v = ((Boolean) (e.getValue())).booleanValue();
+            if (((k) == null)) return O2ZOpenCustomCacheHashMap.this.containsNullKey && ((value[n]) == (v));
             K curr;
-            final K[] key = O2DOpenCustomCacheHashMap.this.key;
-            final int mask = O2DOpenCustomCacheHashMap.this.mask;
+            final K[] key = O2ZOpenCustomCacheHashMap.this.key;
+            final int mask = O2ZOpenCustomCacheHashMap.this.mask;
             int pos;
             if (((curr = key[pos = (HashCommon.mix(strategy.hashCode(k))) & mask]) == null)) return false;
-            if (strategy.equals(k, curr)) return (Double.doubleToRawLongBits(value[pos]) == Double.doubleToRawLongBits(v));
+            if (strategy.equals(k, curr)) return ((value[pos]) == (v));
             while (true) {
                 if (((curr = key[pos = (pos + 1) & mask]) == null)) return false;
-                if (strategy.equals(k, curr)) return (Double.doubleToRawLongBits(value[pos]) == Double.doubleToRawLongBits(v));
+                if (strategy.equals(k, curr)) return ((value[pos]) == (v));
             }
         }
 
@@ -830,23 +783,23 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         public boolean remove(final Object o) {
             if (!(o instanceof Map.Entry)) return false;
             final Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
-            if (e.getValue() == null || !(e.getValue() instanceof Double)) return false;
+            if (e.getValue() == null || !(e.getValue() instanceof Boolean)) return false;
             final K k = ((K) e.getKey());
-            final double v = ((Double) (e.getValue())).doubleValue();
+            final boolean v = ((Boolean) (e.getValue())).booleanValue();
             if (((k) == null)) {
-                if (containsNullKey && (Double.doubleToRawLongBits(value[n]) == Double.doubleToRawLongBits(v))) {
+                if (containsNullKey && ((value[n]) == (v))) {
                     removeNullEntry();
                     return true;
                 }
                 return false;
             }
             K curr;
-            final K[] key = O2DOpenCustomCacheHashMap.this.key;
-            final int mask = O2DOpenCustomCacheHashMap.this.mask;
+            final K[] key = O2ZOpenCustomCacheHashMap.this.key;
+            final int mask = O2ZOpenCustomCacheHashMap.this.mask;
             int pos;
             if (((curr = key[pos = (HashCommon.mix(strategy.hashCode(k))) & mask]) == null)) return false;
             if (strategy.equals(k, curr)) {
-                if ((Double.doubleToRawLongBits(value[pos]) == Double.doubleToRawLongBits(v))) {
+                if (((value[pos]) == (v))) {
                     removeEntry(pos);
                     return true;
                 }
@@ -855,7 +808,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
             while (true) {
                 if (((curr = key[pos = (pos + 1) & mask]) == null)) return false;
                 if (strategy.equals(k, curr)) {
-                    if ((Double.doubleToRawLongBits(value[pos]) == Double.doubleToRawLongBits(v))) {
+                    if (((value[pos]) == (v))) {
                         removeEntry(pos);
                         return true;
                     }
@@ -870,13 +823,13 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
 
         @Override
         public void clear() {
-            O2DOpenCustomCacheHashMap.this.clear();
+            O2ZOpenCustomCacheHashMap.this.clear();
         }
 
         @Override
         public void forEach(final Consumer<? super Entry<K>> consumer) {
             if (containsNullKey) consumer.accept(new MapEntry(n));
-            final K[] key = O2DOpenCustomCacheHashMap.this.key;
+            final K[] key = O2ZOpenCustomCacheHashMap.this.key;
             for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) consumer.accept(new MapEntry(pos));
         }
 
@@ -888,7 +841,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
                 entry.index = n;
                 consumer.accept(entry);
             }
-            final K[] key = O2DOpenCustomCacheHashMap.this.key;
+            final K[] key = O2ZOpenCustomCacheHashMap.this.key;
             for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) {
                 entry.index = pos;
                 consumer.accept(entry);
@@ -897,7 +850,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
     }
 
     @Override
-    public FastEntrySet<K> object2DoubleEntrySet() {
+    public FastEntrySet<K> object2BooleanEntrySet() {
         if (entries == null) entries = new MapEntrySet();
         return entries;
     }
@@ -960,7 +913,7 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         /** {@inheritDoc} */
         @Override
         public void forEach(final Consumer<? super K> consumer) {
-            final K[] key = O2DOpenCustomCacheHashMap.this.key;
+            final K[] key = O2ZOpenCustomCacheHashMap.this.key;
             if (containsNullKey) consumer.accept(key[n]);
             for (int pos = n; pos-- != 0;) {
                 final K k = key[pos];
@@ -981,13 +934,13 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         @Override
         public boolean remove(Object k) {
             final int oldSize = size;
-            O2DOpenCustomCacheHashMap.this.removeDouble(k);
+            O2ZOpenCustomCacheHashMap.this.removeBoolean(k);
             return size != oldSize;
         }
 
         @Override
         public void clear() {
-            O2DOpenCustomCacheHashMap.this.clear();
+            O2ZOpenCustomCacheHashMap.this.clear();
         }
     }
 
@@ -997,26 +950,26 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
         return keys;
     }
 
-    private final class ValueIterator extends MapIterator<java.util.function.DoubleConsumer> implements DoubleIterator {
+    private final class ValueIterator extends MapIterator<BooleanConsumer> implements BooleanIterator {
 
         public ValueIterator() {
             super();
         }
 
         @Override
-        void acceptOnIndex(final java.util.function.DoubleConsumer action, final int index) {
+        void acceptOnIndex(final BooleanConsumer action, final int index) {
             action.accept(value[index]);
         }
 
         @Override
-        public double nextDouble() {
+        public boolean nextBoolean() {
             return value[nextEntry()];
         }
     }
 
-    private final class ValueSpliterator extends MapSpliterator<java.util.function.DoubleConsumer, ValueSpliterator> implements DoubleSpliterator {
+    private final class ValueSpliterator extends MapSpliterator<BooleanConsumer, ValueSpliterator> implements BooleanSpliterator {
 
-        private static final int POST_SPLIT_CHARACTERISTICS = DoubleSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
+        private static final int POST_SPLIT_CHARACTERISTICS = BooleanSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
 
         ValueSpliterator() {}
 
@@ -1026,11 +979,11 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
 
         @Override
         public int characteristics() {
-            return hasSplit ? POST_SPLIT_CHARACTERISTICS : DoubleSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS;
+            return hasSplit ? POST_SPLIT_CHARACTERISTICS : BooleanSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS;
         }
 
         @Override
-        void acceptOnIndex(final java.util.function.DoubleConsumer action, final int index) {
+        void acceptOnIndex(final BooleanConsumer action, final int index) {
             action.accept(value[index]);
         }
 
@@ -1041,24 +994,24 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
     }
 
     @Override
-    public DoubleCollection values() {
-        if (values == null) values = new AbstractDoubleCollection() {
+    public BooleanCollection values() {
+        if (values == null) values = new AbstractBooleanCollection() {
 
             @Override
-            public DoubleIterator iterator() {
+            public BooleanIterator iterator() {
                 return new ValueIterator();
             }
 
             @Override
-            public DoubleSpliterator spliterator() {
+            public BooleanSpliterator spliterator() {
                 return new ValueSpliterator();
             }
 
             /** {@inheritDoc} */
             @Override
-            public void forEach(final java.util.function.DoubleConsumer consumer) {
-                final K[] key = O2DOpenCustomCacheHashMap.this.key;
-                final double[] value = O2DOpenCustomCacheHashMap.this.value;
+            public void forEach(final BooleanConsumer consumer) {
+                final K[] key = O2ZOpenCustomCacheHashMap.this.key;
+                final boolean[] value = O2ZOpenCustomCacheHashMap.this.value;
                 if (containsNullKey) consumer.accept(value[n]);
                 for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) consumer.accept(value[pos]);
             }
@@ -1069,13 +1022,13 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
             }
 
             @Override
-            public boolean contains(double v) {
+            public boolean contains(boolean v) {
                 return containsValue(v);
             }
 
             @Override
             public void clear() {
-                O2DOpenCustomCacheHashMap.this.clear();
+                O2ZOpenCustomCacheHashMap.this.clear();
             }
         };
         return values;
@@ -1084,11 +1037,11 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
     @SuppressWarnings("unchecked")
     protected void rehash(final int newN) {
         final K[] key = this.key;
-        final double[] value = this.value;
+        final boolean[] value = this.value;
         final int[] hash = this.hash;
         final int mask = newN - 1;
         final K[] newKey = (K[]) new Object[newN + 1];
-        final double[] newValue = new double[newN + 1];
+        final boolean[] newValue = new boolean[newN + 1];
         final int[] newHash = new int[newN + 1];
         int i = n, pos, h;
         for (int j = realSize(); j-- != 0;) {
@@ -1108,8 +1061,8 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
     }
 
     @Override
-    public O2DOpenCustomCacheHashMap<K> clone() {
-        O2DOpenCustomCacheHashMap<K> c = (O2DOpenCustomCacheHashMap<K>) super.clone();
+    public O2ZOpenCustomCacheHashMap<K> clone() {
+        O2ZOpenCustomCacheHashMap<K> c = (O2ZOpenCustomCacheHashMap<K>) super.clone();
         c.hash = hash.clone();
         return c;
     }
@@ -1118,16 +1071,16 @@ public final class O2DOpenCustomCacheHashMap<K> extends Object2DoubleOpenCustomH
     public int hashCode() {
         int h = 0;
         final K[] key = this.key;
-        final double[] value = this.value;
+        final boolean[] value = this.value;
         final int[] hash = this.hash;
         for (int j = realSize(), i = 0, t = 0; j-- != 0;) {
             while (((key[i]) == null)) i++;
             if (this != key[i]) t = hash[i];
-            t ^= it.unimi.dsi.fastutil.HashCommon.double2int(value[i]);
+            t ^= (value[i] ? 1231 : 1237);
             h += t;
             i++;
         }
-        if (containsNullKey) h += it.unimi.dsi.fastutil.HashCommon.double2int(value[n]);
+        if (containsNullKey) h += (value[n] ? 1231 : 1237);
         return h;
     }
 }

@@ -9,8 +9,8 @@ import java.util.function.Function;
  * <p>Mappings follow {@code putIfAbsent} semantics: the value bound to a key is
  * decided by the first thread that stores it, and later writers never replace it
  * (the existing value is returned instead). A factory is wired into the
- * constructor and used by the no-argument convenience methods; it must not be
- * {@code null} for caches that rely on those methods.
+ * constructor and used by the no-argument convenience methods; it may be
+ * {@code null}, in which case those methods throw {@link NullPointerException}.
  */
 public interface MapCache<K, V> {
 
@@ -64,18 +64,7 @@ public interface MapCache<K, V> {
      * once, the function may run more than once; the first computed value wins.
      * The function must not return {@code null}.
      */
-    default V getCacheRecursive(final K k, Function<? super K, ? extends V> createFunction) {
-        V v = getIfPresent(k);
-        if (v != null) {
-            return v;
-        }
-        v = createFunction.apply(k);
-        if (v == null) {
-            return null;
-        }
-        V prev = putIfAbsent(k, v);
-        return prev == null ? v : prev;
-    }
+    V getCacheRecursive(final K k, Function<? super K, ? extends V> createFunction);
 
     /**
      * Uses the factory wired into the constructor.

@@ -1,5 +1,6 @@
 package com.gto.fastcollection;
 
+import com.gto.fastcollection.fastutil.*;
 import it.unimi.dsi.fastutil.Hash;
 import org.junit.jupiter.api.Test;
 

@@ -1,7 +1,7 @@
-package com.gto.fastcollection;
+package com.gto.fastcollection.fastutil;
 
 import it.unimi.dsi.fastutil.HashCommon;
-import it.unimi.dsi.fastutil.floats.*;
+import it.unimi.dsi.fastutil.chars.*;
 import it.unimi.dsi.fastutil.objects.*;
 
 import java.util.Arrays;
@@ -13,42 +13,42 @@ import java.util.function.ToIntFunction;
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 import static it.unimi.dsi.fastutil.HashCommon.maxFill;
 
-public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
+public final class O2COpenCacheHashMap<K> extends Object2CharOpenHashMap<K> {
 
     private int[] hash;
 
-    public O2FOpenCacheHashMap(final int expected, final float f) {
+    public O2COpenCacheHashMap(final int expected, final float f) {
         super(expected, f);
         hash = new int[n + 1];
     }
 
-    public O2FOpenCacheHashMap(final int expected) {
+    public O2COpenCacheHashMap(final int expected) {
         super(expected, DEFAULT_LOAD_FACTOR);
         hash = new int[n + 1];
     }
 
-    public O2FOpenCacheHashMap() {
+    public O2COpenCacheHashMap() {
         super(DEFAULT_INITIAL_SIZE, DEFAULT_LOAD_FACTOR);
         hash = new int[n + 1];
     }
 
-    public O2FOpenCacheHashMap(final Map<? extends K, ? extends Float> m, final float f) {
+    public O2COpenCacheHashMap(final Map<? extends K, ? extends Character> m, final float f) {
         super(m.size(), f);
         hash = new int[n + 1];
         putAll(m);
     }
 
-    public O2FOpenCacheHashMap(final Map<? extends K, ? extends Float> m) {
+    public O2COpenCacheHashMap(final Map<? extends K, ? extends Character> m) {
         this(m, DEFAULT_LOAD_FACTOR);
     }
 
-    public O2FOpenCacheHashMap(final Object2FloatMap<K> m, final float f) {
+    public O2COpenCacheHashMap(final Object2CharMap<K> m, final float f) {
         super(m.size(), f);
         hash = new int[n + 1];
         putAll(m);
     }
 
-    public O2FOpenCacheHashMap(final Object2FloatMap<K> m) {
+    public O2COpenCacheHashMap(final Object2CharMap<K> m) {
         this(m, DEFAULT_LOAD_FACTOR);
     }
 
@@ -56,13 +56,13 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
         return containsNullKey ? size - 1 : size;
     }
 
-    private float removeEntry(int pos) {
-        final float oldValue = value[pos];
+    private char removeEntry(int pos) {
+        final char oldValue = value[pos];
         size--;
         int last, slot, ch;
         K curr;
         final K[] key = this.key;
-        final float[] value = this.value;
+        final char[] value = this.value;
         final int[] hash = this.hash;
         final int mask = this.mask;
         a:
@@ -71,7 +71,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
             for (;;) {
                 if ((curr = key[pos]) == null) {
                     key[last] = null;
-                    value[last] = 0f;
+                    value[last] = 0;
                     hash[last] = 0;
                     break a;
                 }
@@ -88,11 +88,11 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
         return oldValue;
     }
 
-    private float removeNullEntry() {
+    private char removeNullEntry() {
         containsNullKey = false;
         key[n] = null;
         hash[n] = 0;
-        final float oldValue = value[n];
+        final char oldValue = value[n];
         size--;
         if (n > minN && size < maxFill / 4 && n > DEFAULT_INITIAL_SIZE) rehash(n / 2);
         return oldValue;
@@ -112,7 +112,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
         }
     }
 
-    private void insert(final int pos, final K k, final float v, final int h) {
+    private void insert(final int pos, final K k, final char v, final int h) {
         if (pos == n) containsNullKey = true;
         key[pos] = k;
         value[pos] = v;
@@ -121,7 +121,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
     }
 
     @Override
-    public float put(final K k, final float v) {
+    public char put(final K k, final char v) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -133,19 +133,19 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
             insert(-pos - 1, k, v, h);
             return defRetValue;
         }
-        final float oldValue = value[pos];
+        final char oldValue = value[pos];
         value[pos] = v;
         return oldValue;
     }
 
-    private float addToValue(final int pos, final float incr) {
-        final float oldValue = value[pos];
-        value[pos] = oldValue + incr;
+    private char addToValue(final int pos, final char incr) {
+        final char oldValue = value[pos];
+        value[pos] = (char)(oldValue + incr);
         return oldValue;
     }
 
     @Override
-    public float addTo(final K k, final float incr) {
+    public char addTo(final K k, final char incr) {
         int pos, h = 0;
         if (k == null) {
             if (containsNullKey) return addToValue(n, incr);
@@ -164,13 +164,13 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
         }
         key[pos] = k;
         hash[pos] = h;
-        value[pos] = defRetValue + incr;
+        value[pos] = (char)(defRetValue + incr);
         if (size++ >= maxFill) rehash(arraySize(size + 1, f));
         return defRetValue;
     }
 
     @Override
-    public float removeFloat(final Object k) {
+    public char removeChar(final Object k) {
         if (k == null) {
             if (containsNullKey) return removeNullEntry();
             return defRetValue;
@@ -190,7 +190,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
     }
 
     @Override
-    public float getFloat(final Object k) {
+    public char getChar(final Object k) {
         if (k == null) return containsNullKey ? value[n] : defRetValue;
         K curr;
         final K[] key = this.key;
@@ -224,7 +224,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
     }
 
     @Override
-    public float getOrDefault(final Object k, final float defaultValue) {
+    public char getOrDefault(final Object k, final char defaultValue) {
         if (k == null) return containsNullKey ? value[n] : defaultValue;
         K curr;
         final K[] key = this.key;
@@ -241,7 +241,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
     }
 
     @Override
-    public float putIfAbsent(final K k, final float v) {
+    public char putIfAbsent(final K k, final char v) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -255,7 +255,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
     }
 
     @Override
-    public boolean remove(final Object k, final float v) {
+    public boolean remove(final Object k, final char v) {
         if (k == null) {
             if (containsNullKey && v == value[n]) {
                 removeNullEntry();
@@ -284,7 +284,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
     }
 
     @Override
-    public boolean replace(final K k, final float oldValue, final float v) {
+    public boolean replace(final K k, final char oldValue, final char v) {
         int pos;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -298,7 +298,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
     }
 
     @Override
-    public float replace(final K k, final float v) {
+    public char replace(final K k, final char v) {
         int pos;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -307,13 +307,13 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
             pos = find(k, h);
         }
         if (pos < 0) return defRetValue;
-        final float oldValue = value[pos];
+        final char oldValue = value[pos];
         value[pos] = v;
         return oldValue;
     }
 
     @Override
-    public float computeIfAbsent(final K k, final java.util.function.ToDoubleFunction<? super K> mappingFunction) {
+    public char computeIfAbsent(final K k, final ToIntFunction<? super K> mappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -322,13 +322,13 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
             pos = find(k, h);
         }
         if (pos >= 0) return value[pos];
-        final float newValue = it.unimi.dsi.fastutil.SafeMath.safeDoubleToFloat(mappingFunction.applyAsDouble(k));
+        final char newValue = it.unimi.dsi.fastutil.SafeMath.safeIntToChar(mappingFunction.applyAsInt(k));
         insert(-pos - 1, k, newValue, h);
         return newValue;
     }
 
     @Override
-    public float computeIfAbsent(final K k, final Object2FloatFunction<? super K> mappingFunction) {
+    public char computeIfAbsent(final K k, final Object2CharFunction<? super K> mappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -338,13 +338,13 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
         }
         if (pos >= 0) return value[pos];
         if (!mappingFunction.containsKey(key)) return defRetValue;
-        final float newValue = mappingFunction.getFloat(k);
+        final char newValue = mappingFunction.getChar(k);
         insert(-pos - 1, k, newValue, h);
         return newValue;
     }
 
     @Override
-    public float computeFloatIfPresent(final K k, final BiFunction<? super K, ? super Float, ? extends Float> remappingFunction) {
+    public char computeCharIfPresent(final K k, final BiFunction<? super K, ? super Character, ? extends Character> remappingFunction) {
         int pos;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -353,7 +353,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
             pos = find(k, h);
         }
         if (pos < 0) return defRetValue;
-        final Float newValue = remappingFunction.apply((k), Float.valueOf(value[pos]));
+        final Character newValue = remappingFunction.apply((k), Character.valueOf(value[pos]));
         if (newValue == null) {
             if (k == null) removeNullEntry();
             else removeEntry(pos);
@@ -363,7 +363,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
     }
 
     @Override
-    public float computeFloat(final K k, final BiFunction<? super K, ? super Float, ? extends Float> remappingFunction) {
+    public char computeChar(final K k, final BiFunction<? super K, ? super Character, ? extends Character> remappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -371,7 +371,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
             h = k.hashCode();
             pos = find(k, h);
         }
-        final Float newValue = remappingFunction.apply((k), pos >= 0 ? Float.valueOf(value[pos]) : null);
+        final Character newValue = remappingFunction.apply((k), pos >= 0 ? Character.valueOf(value[pos]) : null);
         if (newValue == null) {
             if (pos >= 0) {
                 if (k == null) removeNullEntry();
@@ -379,7 +379,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
             }
             return defRetValue;
         }
-        float newVal = newValue;
+        char newVal = newValue;
         if (pos < 0) {
             insert(-pos - 1, k, newVal, h);
             return newVal;
@@ -389,7 +389,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
 
     /** {@inheritDoc} */
     @Override
-    public float mergeFloat(final K k, final float v, it.unimi.dsi.fastutil.floats.FloatBinaryOperator remappingFunction) {
+    public char mergeChar(final K k, final char v, it.unimi.dsi.fastutil.chars.CharBinaryOperator remappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -401,12 +401,12 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
             insert(-pos - 1, k, v, h);
             return v;
         }
-        final float newValue = remappingFunction.apply(value[pos], v);
+        final char newValue = remappingFunction.apply(value[pos], v);
         return value[pos] = newValue;
     }
 
     @Override
-    public float merge(final K k, final float v, final BiFunction<? super Float, ? super Float, ? extends Float> remappingFunction) {
+    public char merge(final K k, final char v, final BiFunction<? super Character, ? super Character, ? extends Character> remappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -418,7 +418,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
             insert(-pos - 1, k, v, h);
             return v;
         }
-        final Float newValue = remappingFunction.apply(Float.valueOf(value[pos]), Float.valueOf(v));
+        final Character newValue = remappingFunction.apply(Character.valueOf(value[pos]), Character.valueOf(v));
         if (newValue == null) {
             if (k == null) removeNullEntry();
             else removeEntry(pos);
@@ -436,7 +436,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
         Arrays.fill(hash, 0);
     }
 
-    final class MapEntry implements Entry<K>, ObjectFloatPair<K> {
+    final class MapEntry implements Entry<K>, ObjectCharPair<K> {
 
         int index;
 
@@ -457,51 +457,51 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
         }
 
         @Override
-        public float getFloatValue() {
+        public char getCharValue() {
             return value[index];
         }
 
         @Override
-        public float rightFloat() {
+        public char rightChar() {
             return value[index];
         }
 
         @Override
-        public float setValue(final float v) {
-            final float oldValue = value[index];
+        public char setValue(final char v) {
+            final char oldValue = value[index];
             value[index] = v;
             return oldValue;
         }
 
         @Override
-        public ObjectFloatPair<K> right(final float v) {
+        public ObjectCharPair<K> right(final char v) {
             value[index] = v;
             return this;
         }
 
         @Deprecated
         @Override
-        public Float getValue() {
+        public Character getValue() {
             return value[index];
         }
 
         @Deprecated
         @Override
-        public Float setValue(final Float v) {
-            return Float.valueOf(setValue((v).floatValue()));
+        public Character setValue(final Character v) {
+            return Character.valueOf(setValue((v).charValue()));
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public boolean equals(final Object o) {
             if (!(o instanceof Map.Entry)) return false;
-            Map.Entry<K, Float> e = (Map.Entry<K, Float>) o;
-            return java.util.Objects.equals(key[index], (e.getKey())) && (Float.floatToRawIntBits(value[index]) == Float.floatToRawIntBits((e.getValue()).floatValue()));
+            Map.Entry<K, Character> e = (Map.Entry<K, Character>) o;
+            return java.util.Objects.equals(key[index], (e.getKey())) && ((value[index]) == ((e.getValue()).charValue()));
         }
 
         @Override
         public int hashCode() {
-            return hash[index] ^ it.unimi.dsi.fastutil.HashCommon.float2int(value[index]);
+            return hash[index] ^ value[index];
         }
 
         @Override
@@ -515,7 +515,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
         int pos = n;
         int last = -1;
         int c = size;
-        boolean mustReturnNullKey = O2FOpenCacheHashMap.this.containsNullKey;
+        boolean mustReturnNullKey = O2COpenCacheHashMap.this.containsNullKey;
         ObjectArrayList<K> wrapped;
 
         abstract void acceptOnIndex(final ConsumerType action, final int index);
@@ -530,9 +530,9 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
                 mustReturnNullKey = false;
                 return last = n;
             }
-            final K[] key = O2FOpenCacheHashMap.this.key;
-            final int[] hash = O2FOpenCacheHashMap.this.hash;
-            final int mask = O2FOpenCacheHashMap.this.mask;
+            final K[] key = O2COpenCacheHashMap.this.key;
+            final int[] hash = O2COpenCacheHashMap.this.hash;
+            final int mask = O2COpenCacheHashMap.this.mask;
             for (;;) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
@@ -552,9 +552,9 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
                 acceptOnIndex(action, last = n);
                 c--;
             }
-            final K[] key = O2FOpenCacheHashMap.this.key;
-            final int[] hash = O2FOpenCacheHashMap.this.hash;
-            final int mask = O2FOpenCacheHashMap.this.mask;
+            final K[] key = O2COpenCacheHashMap.this.key;
+            final int[] hash = O2COpenCacheHashMap.this.hash;
+            final int mask = O2COpenCacheHashMap.this.mask;
             while (c != 0) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
@@ -574,10 +574,10 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
         private void shiftKeys(int pos) {
             int last, slot, ch;
             K curr;
-            final K[] key = O2FOpenCacheHashMap.this.key;
-            final float[] value = O2FOpenCacheHashMap.this.value;
-            final int[] hash = O2FOpenCacheHashMap.this.hash;
-            final int mask = O2FOpenCacheHashMap.this.mask;
+            final K[] key = O2COpenCacheHashMap.this.key;
+            final char[] value = O2COpenCacheHashMap.this.value;
+            final int[] hash = O2COpenCacheHashMap.this.hash;
+            final int mask = O2COpenCacheHashMap.this.mask;
             for (;;) {
                 pos = ((last = pos) + 1) & mask;
                 for (;;) {
@@ -608,7 +608,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
                 hash[n] = 0;
             } else if (pos >= 0) shiftKeys(last);
             else {
-                O2FOpenCacheHashMap.this.removeFloat(wrapped.set(-pos - 1, null));
+                O2COpenCacheHashMap.this.removeChar(wrapped.set(-pos - 1, null));
                 last = -1;
                 return;
             }
@@ -666,7 +666,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
         int pos = 0;
         int max = n;
         int c = 0;
-        boolean mustReturnNull = O2FOpenCacheHashMap.this.containsNullKey;
+        boolean mustReturnNull = O2COpenCacheHashMap.this.containsNullKey;
         boolean hasSplit = false;
 
         MapSpliterator() {}
@@ -689,7 +689,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
                 acceptOnIndex(action, n);
                 return true;
             }
-            final K[] key = O2FOpenCacheHashMap.this.key;
+            final K[] key = O2COpenCacheHashMap.this.key;
             while (pos < max) {
                 if (!((key[pos]) == null)) {
                     ++c;
@@ -707,7 +707,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
                 ++c;
                 acceptOnIndex(action, n);
             }
-            final K[] key = O2FOpenCacheHashMap.this.key;
+            final K[] key = O2COpenCacheHashMap.this.key;
             while (pos < max) {
                 if (!((key[pos]) == null)) {
                     acceptOnIndex(action, pos);
@@ -746,7 +746,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
                 ++skipped;
                 --n;
             }
-            final K[] key = O2FOpenCacheHashMap.this.key;
+            final K[] key = O2COpenCacheHashMap.this.key;
             while (pos < max && n > 0) {
                 if (!((key[pos++]) == null)) {
                     ++skipped;
@@ -805,19 +805,19 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
         public boolean contains(final Object o) {
             if (!(o instanceof Map.Entry)) return false;
             final Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
-            if (e.getValue() == null || !(e.getValue() instanceof Float)) return false;
+            if (e.getValue() == null || !(e.getValue() instanceof Character)) return false;
             final K k = ((K) e.getKey());
-            final float v = ((Float) (e.getValue())).floatValue();
-            if (((k) == null)) return O2FOpenCacheHashMap.this.containsNullKey && (Float.floatToRawIntBits(value[n]) == Float.floatToRawIntBits(v));
+            final char v = ((Character) (e.getValue())).charValue();
+            if (((k) == null)) return O2COpenCacheHashMap.this.containsNullKey && ((value[n]) == (v));
             K curr;
-            final K[] key = O2FOpenCacheHashMap.this.key;
-            final int mask = O2FOpenCacheHashMap.this.mask;
+            final K[] key = O2COpenCacheHashMap.this.key;
+            final int mask = O2COpenCacheHashMap.this.mask;
             int pos;
             if (((curr = key[pos = (HashCommon.mix((k).hashCode())) & mask]) == null)) return false;
-            if (((k).equals(curr))) return (Float.floatToRawIntBits(value[pos]) == Float.floatToRawIntBits(v));
+            if (((k).equals(curr))) return ((value[pos]) == (v));
             while (true) {
                 if (((curr = key[pos = (pos + 1) & mask]) == null)) return false;
-                if (((k).equals(curr))) return (Float.floatToRawIntBits(value[pos]) == Float.floatToRawIntBits(v));
+                if (((k).equals(curr))) return ((value[pos]) == (v));
             }
         }
 
@@ -826,23 +826,23 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
         public boolean remove(final Object o) {
             if (!(o instanceof Map.Entry)) return false;
             final Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
-            if (e.getValue() == null || !(e.getValue() instanceof Float)) return false;
+            if (e.getValue() == null || !(e.getValue() instanceof Character)) return false;
             final K k = ((K) e.getKey());
-            final float v = ((Float) (e.getValue())).floatValue();
+            final char v = ((Character) (e.getValue())).charValue();
             if (((k) == null)) {
-                if (containsNullKey && (Float.floatToRawIntBits(value[n]) == Float.floatToRawIntBits(v))) {
+                if (containsNullKey && ((value[n]) == (v))) {
                     removeNullEntry();
                     return true;
                 }
                 return false;
             }
             K curr;
-            final K[] key = O2FOpenCacheHashMap.this.key;
-            final int mask = O2FOpenCacheHashMap.this.mask;
+            final K[] key = O2COpenCacheHashMap.this.key;
+            final int mask = O2COpenCacheHashMap.this.mask;
             int pos;
             if (((curr = key[pos = (HashCommon.mix((k).hashCode())) & mask]) == null)) return false;
             if (((curr).equals(k))) {
-                if ((Float.floatToRawIntBits(value[pos]) == Float.floatToRawIntBits(v))) {
+                if (((value[pos]) == (v))) {
                     removeEntry(pos);
                     return true;
                 }
@@ -851,7 +851,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
             while (true) {
                 if (((curr = key[pos = (pos + 1) & mask]) == null)) return false;
                 if (((curr).equals(k))) {
-                    if ((Float.floatToRawIntBits(value[pos]) == Float.floatToRawIntBits(v))) {
+                    if (((value[pos]) == (v))) {
                         removeEntry(pos);
                         return true;
                     }
@@ -866,13 +866,13 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
 
         @Override
         public void clear() {
-            O2FOpenCacheHashMap.this.clear();
+            O2COpenCacheHashMap.this.clear();
         }
 
         @Override
         public void forEach(final Consumer<? super Entry<K>> consumer) {
             if (containsNullKey) consumer.accept(new MapEntry(n));
-            final K[] key = O2FOpenCacheHashMap.this.key;
+            final K[] key = O2COpenCacheHashMap.this.key;
             for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) consumer.accept(new MapEntry(pos));
         }
 
@@ -884,7 +884,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
                 entry.index = n;
                 consumer.accept(entry);
             }
-            final K[] key = O2FOpenCacheHashMap.this.key;
+            final K[] key = O2COpenCacheHashMap.this.key;
             for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) {
                 entry.index = pos;
                 consumer.accept(entry);
@@ -893,7 +893,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
     }
 
     @Override
-    public FastEntrySet<K> object2FloatEntrySet() {
+    public FastEntrySet<K> object2CharEntrySet() {
         if (entries == null) entries = new MapEntrySet();
         return entries;
     }
@@ -956,7 +956,7 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
         /** {@inheritDoc} */
         @Override
         public void forEach(final Consumer<? super K> consumer) {
-            final K[] key = O2FOpenCacheHashMap.this.key;
+            final K[] key = O2COpenCacheHashMap.this.key;
             if (containsNullKey) consumer.accept(key[n]);
             for (int pos = n; pos-- != 0;) {
                 final K k = key[pos];
@@ -977,13 +977,13 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
         @Override
         public boolean remove(Object k) {
             final int oldSize = size;
-            O2FOpenCacheHashMap.this.removeFloat(k);
+            O2COpenCacheHashMap.this.removeChar(k);
             return size != oldSize;
         }
 
         @Override
         public void clear() {
-            O2FOpenCacheHashMap.this.clear();
+            O2COpenCacheHashMap.this.clear();
         }
     }
 
@@ -993,26 +993,26 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
         return keys;
     }
 
-    private final class ValueIterator extends MapIterator<FloatConsumer> implements FloatIterator {
+    private final class ValueIterator extends MapIterator<CharConsumer> implements CharIterator {
 
         public ValueIterator() {
             super();
         }
 
         @Override
-        void acceptOnIndex(final FloatConsumer action, final int index) {
+        void acceptOnIndex(final CharConsumer action, final int index) {
             action.accept(value[index]);
         }
 
         @Override
-        public float nextFloat() {
+        public char nextChar() {
             return value[nextEntry()];
         }
     }
 
-    private final class ValueSpliterator extends MapSpliterator<FloatConsumer, ValueSpliterator> implements FloatSpliterator {
+    private final class ValueSpliterator extends MapSpliterator<CharConsumer, ValueSpliterator> implements CharSpliterator {
 
-        private static final int POST_SPLIT_CHARACTERISTICS = FloatSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
+        private static final int POST_SPLIT_CHARACTERISTICS = CharSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
 
         ValueSpliterator() {}
 
@@ -1022,11 +1022,11 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
 
         @Override
         public int characteristics() {
-            return hasSplit ? POST_SPLIT_CHARACTERISTICS : FloatSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS;
+            return hasSplit ? POST_SPLIT_CHARACTERISTICS : CharSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS;
         }
 
         @Override
-        void acceptOnIndex(final FloatConsumer action, final int index) {
+        void acceptOnIndex(final CharConsumer action, final int index) {
             action.accept(value[index]);
         }
 
@@ -1037,24 +1037,24 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
     }
 
     @Override
-    public FloatCollection values() {
-        if (values == null) values = new AbstractFloatCollection() {
+    public CharCollection values() {
+        if (values == null) values = new AbstractCharCollection() {
 
             @Override
-            public FloatIterator iterator() {
+            public CharIterator iterator() {
                 return new ValueIterator();
             }
 
             @Override
-            public FloatSpliterator spliterator() {
+            public CharSpliterator spliterator() {
                 return new ValueSpliterator();
             }
 
             /** {@inheritDoc} */
             @Override
-            public void forEach(final FloatConsumer consumer) {
-                final K[] key = O2FOpenCacheHashMap.this.key;
-                final float[] value = O2FOpenCacheHashMap.this.value;
+            public void forEach(final CharConsumer consumer) {
+                final K[] key = O2COpenCacheHashMap.this.key;
+                final char[] value = O2COpenCacheHashMap.this.value;
                 if (containsNullKey) consumer.accept(value[n]);
                 for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) consumer.accept(value[pos]);
             }
@@ -1065,13 +1065,13 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
             }
 
             @Override
-            public boolean contains(float v) {
+            public boolean contains(char v) {
                 return containsValue(v);
             }
 
             @Override
             public void clear() {
-                O2FOpenCacheHashMap.this.clear();
+                O2COpenCacheHashMap.this.clear();
             }
         };
         return values;
@@ -1080,11 +1080,11 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
     @SuppressWarnings("unchecked")
     protected void rehash(final int newN) {
         final K[] key = this.key;
-        final float[] value = this.value;
+        final char[] value = this.value;
         final int[] hash = this.hash;
         final int mask = newN - 1;
         final K[] newKey = (K[]) new Object[newN + 1];
-        final float[] newValue = new float[newN + 1];
+        final char[] newValue = new char[newN + 1];
         final int[] newHash = new int[newN + 1];
         int i = n, pos, h;
         for (int j = realSize(); j-- != 0;) {
@@ -1104,8 +1104,8 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
     }
 
     @Override
-    public O2FOpenCacheHashMap<K> clone() {
-        O2FOpenCacheHashMap<K> c = (O2FOpenCacheHashMap<K>) super.clone();
+    public O2COpenCacheHashMap<K> clone() {
+        O2COpenCacheHashMap<K> c = (O2COpenCacheHashMap<K>) super.clone();
         c.hash = hash.clone();
         return c;
     }
@@ -1114,16 +1114,16 @@ public final class O2FOpenCacheHashMap<K> extends Object2FloatOpenHashMap<K> {
     public int hashCode() {
         int h = 0;
         final K[] key = this.key;
-        final float[] value = this.value;
+        final char[] value = this.value;
         final int[] hash = this.hash;
         for (int j = realSize(), i = 0, t = 0; j-- != 0;) {
             while (((key[i]) == null)) i++;
             if (this != key[i]) t = hash[i];
-            t ^= it.unimi.dsi.fastutil.HashCommon.float2int(value[i]);
+            t ^= value[i];
             h += t;
             i++;
         }
-        if (containsNullKey) h += it.unimi.dsi.fastutil.HashCommon.float2int(value[n]);
+        if (containsNullKey) h += value[n];
         return h;
     }
 }

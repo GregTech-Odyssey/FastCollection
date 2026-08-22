@@ -1,7 +1,7 @@
 package com.gto.fastcollection.cache;
 
 import org.openjdk.jmh.runner.Runner;
-import org.openjdk.jmh.runner.options.Options;
+
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 /**
@@ -13,19 +13,20 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
  * are trustworthy.
  *
  * <p>Run from the IDE (execute {@code main}) or from Gradle:
- * {@code ./gradlew jmh} if wired up, otherwise via the test classpath.
- * Optional arguments filter which benchmarks run, e.g.:
- * {@code OpenCacheHashSetBenchmark} or {@code O2OOpenCacheHashMapBenchmark.getHit}.
+ * {@code ./gradlew jmh -Pbenchmark="CacheBenchmark"} filters which benchmarks
+ * run. An optional second argument adds JMH profilers, e.g. {@code gc} for
+ * allocation norms: {@code ./gradlew jmh -Pbenchmark="..." -Pprof=gc}.
  */
 public class BenchmarkRunner {
 
     public static void main(String[] args) throws Exception {
         String filter = args.length > 0 ? args[0] : ".*";
-        Options options = new OptionsBuilder()
+        var builder = new OptionsBuilder()
                 // no forks/iterations override: respect the class annotations
-                .include(filter)
-                .build();
-
-        new Runner(options).run();
+                .include(filter);
+        if (args.length > 1 && !args[1].isEmpty()) {
+            builder.addProfiler(args[1]);
+        }
+        new Runner(builder.build()).run();
     }
 }

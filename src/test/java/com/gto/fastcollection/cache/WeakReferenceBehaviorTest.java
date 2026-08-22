@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.Hash;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import java.lang.ref.WeakReference;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -90,6 +91,33 @@ class WeakReferenceBehaviorTest {
             return interner.intern(probe) == probe;
         });
         assertThat(reaped).as("old interned key collected and a fresh canonical instance accepted").isTrue();
+    }
+
+    @Test
+    void isPresentSkipsDeadNodesEarlierInTheChain() throws InterruptedException {
+        // a constant hash forces every entry into the same chain
+        Hash.Strategy<String> constantHash = new Hash.Strategy<>() {
+            @Override
+            public int hashCode(String o) {
+                return 42;
+            }
+
+            @Override
+            public boolean equals(String a, String b) {
+                return a.equals(b);
+            }
+        };
+        WeakCustomHashInterner<String> interner = new WeakCustomHashInterner<>(constantHash);
+        String tail = new String("tail");
+        interner.intern(tail);
+        String head = new String("head");
+        WeakReference<String> headRef = new WeakReference<>(head);
+        interner.intern(head); // chain: head -> tail
+        head = null;
+
+        assertThat(awaitRecreation(() -> headRef.get() == null)).as("head instance collected").isTrue();
+        // the dead head node must not hide the live canonical instance behind it
+        assertThat(interner.isPresent(new String("tail"))).isTrue();
     }
 
     @Test

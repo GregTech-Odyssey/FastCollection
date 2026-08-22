@@ -8,7 +8,7 @@ import java.lang.ref.WeakReference;
  * whose value has been collected is dead and removed by writers or
  * {@code clearInvalid}.
  */
-final class WeakReferenceValueNode<K, V> extends WeakReference<V> {
+final class WeakReferenceValueNode<K, V> extends WeakReference<V> implements ChainNode<WeakReferenceValueNode<K, V>> {
 
     final K key;
     final int hash;
@@ -18,6 +18,16 @@ final class WeakReferenceValueNode<K, V> extends WeakReference<V> {
         super(value);
         this.key = key;
         this.hash = hash;
+        this.next = next;
+    }
+
+    @Override
+    public WeakReferenceValueNode<K, V> getNext() {
+        return next;
+    }
+
+    @Override
+    public void setNext(WeakReferenceValueNode<K, V> next) {
         this.next = next;
     }
 }

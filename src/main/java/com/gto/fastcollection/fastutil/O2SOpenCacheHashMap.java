@@ -1,7 +1,7 @@
-package com.gto.fastcollection;
+package com.gto.fastcollection.fastutil;
 
 import it.unimi.dsi.fastutil.HashCommon;
-import it.unimi.dsi.fastutil.booleans.*;
+import it.unimi.dsi.fastutil.shorts.*;
 import it.unimi.dsi.fastutil.objects.*;
 
 import java.util.Arrays;
@@ -13,42 +13,42 @@ import java.util.function.ToIntFunction;
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 import static it.unimi.dsi.fastutil.HashCommon.maxFill;
 
-public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
+public final class O2SOpenCacheHashMap<K> extends Object2ShortOpenHashMap<K> {
 
     private int[] hash;
 
-    public O2ZOpenCacheHashMap(final int expected, final float f) {
+    public O2SOpenCacheHashMap(final int expected, final float f) {
         super(expected, f);
         hash = new int[n + 1];
     }
 
-    public O2ZOpenCacheHashMap(final int expected) {
+    public O2SOpenCacheHashMap(final int expected) {
         super(expected, DEFAULT_LOAD_FACTOR);
         hash = new int[n + 1];
     }
 
-    public O2ZOpenCacheHashMap() {
+    public O2SOpenCacheHashMap() {
         super(DEFAULT_INITIAL_SIZE, DEFAULT_LOAD_FACTOR);
         hash = new int[n + 1];
     }
 
-    public O2ZOpenCacheHashMap(final Map<? extends K, ? extends Boolean> m, final float f) {
+    public O2SOpenCacheHashMap(final Map<? extends K, ? extends Short> m, final float f) {
         super(m.size(), f);
         hash = new int[n + 1];
         putAll(m);
     }
 
-    public O2ZOpenCacheHashMap(final Map<? extends K, ? extends Boolean> m) {
+    public O2SOpenCacheHashMap(final Map<? extends K, ? extends Short> m) {
         this(m, DEFAULT_LOAD_FACTOR);
     }
 
-    public O2ZOpenCacheHashMap(final Object2BooleanMap<K> m, final float f) {
+    public O2SOpenCacheHashMap(final Object2ShortMap<K> m, final float f) {
         super(m.size(), f);
         hash = new int[n + 1];
         putAll(m);
     }
 
-    public O2ZOpenCacheHashMap(final Object2BooleanMap<K> m) {
+    public O2SOpenCacheHashMap(final Object2ShortMap<K> m) {
         this(m, DEFAULT_LOAD_FACTOR);
     }
 
@@ -56,13 +56,13 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         return containsNullKey ? size - 1 : size;
     }
 
-    private boolean removeEntry(int pos) {
-        final boolean oldValue = value[pos];
+    private short removeEntry(int pos) {
+        final short oldValue = value[pos];
         size--;
         int last, slot, ch;
         K curr;
         final K[] key = this.key;
-        final boolean[] value = this.value;
+        final short[] value = this.value;
         final int[] hash = this.hash;
         final int mask = this.mask;
         a:
@@ -71,7 +71,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
             for (;;) {
                 if ((curr = key[pos]) == null) {
                     key[last] = null;
-                    value[last] = false;
+                    value[last] = 0;
                     hash[last] = 0;
                     break a;
                 }
@@ -88,11 +88,11 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         return oldValue;
     }
 
-    private boolean removeNullEntry() {
+    private short removeNullEntry() {
         containsNullKey = false;
         key[n] = null;
         hash[n] = 0;
-        final boolean oldValue = value[n];
+        final short oldValue = value[n];
         size--;
         if (n > minN && size < maxFill / 4 && n > DEFAULT_INITIAL_SIZE) rehash(n / 2);
         return oldValue;
@@ -112,7 +112,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         }
     }
 
-    private void insert(final int pos, final K k, final boolean v, final int h) {
+    private void insert(final int pos, final K k, final short v, final int h) {
         if (pos == n) containsNullKey = true;
         key[pos] = k;
         value[pos] = v;
@@ -121,7 +121,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
     }
 
     @Override
-    public boolean put(final K k, final boolean v) {
+    public short put(final K k, final short v) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -133,15 +133,44 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
             insert(-pos - 1, k, v, h);
             return defRetValue;
         }
-        final boolean oldValue = value[pos];
+        final short oldValue = value[pos];
         value[pos] = v;
         return oldValue;
     }
 
-
+    private short addToValue(final int pos, final short incr) {
+        final short oldValue = value[pos];
+        value[pos] = (short)(oldValue + incr);
+        return oldValue;
+    }
 
     @Override
-    public boolean removeBoolean(final Object k) {
+    public short addTo(final K k, final short incr) {
+        int pos, h = 0;
+        if (k == null) {
+            if (containsNullKey) return addToValue(n, incr);
+            pos = n;
+            containsNullKey = true;
+        } else {
+            h = k.hashCode();
+            K curr;
+            final K[] key = this.key;
+            final int[] hash = this.hash;
+            final int mask = this.mask;
+            if ((curr = key[pos = HashCommon.mix(h) & mask]) != null) {
+                do if (hash[pos] == h && curr.equals(k)) return addToValue(pos, incr);
+                while ((curr = key[pos = (pos + 1) & mask]) != null);
+            }
+        }
+        key[pos] = k;
+        hash[pos] = h;
+        value[pos] = (short)(defRetValue + incr);
+        if (size++ >= maxFill) rehash(arraySize(size + 1, f));
+        return defRetValue;
+    }
+
+    @Override
+    public short removeShort(final Object k) {
         if (k == null) {
             if (containsNullKey) return removeNullEntry();
             return defRetValue;
@@ -161,7 +190,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
     }
 
     @Override
-    public boolean getBoolean(final Object k) {
+    public short getShort(final Object k) {
         if (k == null) return containsNullKey ? value[n] : defRetValue;
         K curr;
         final K[] key = this.key;
@@ -195,7 +224,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
     }
 
     @Override
-    public boolean getOrDefault(final Object k, final boolean defaultValue) {
+    public short getOrDefault(final Object k, final short defaultValue) {
         if (k == null) return containsNullKey ? value[n] : defaultValue;
         K curr;
         final K[] key = this.key;
@@ -212,7 +241,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
     }
 
     @Override
-    public boolean putIfAbsent(final K k, final boolean v) {
+    public short putIfAbsent(final K k, final short v) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -226,7 +255,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
     }
 
     @Override
-    public boolean remove(final Object k, final boolean v) {
+    public boolean remove(final Object k, final short v) {
         if (k == null) {
             if (containsNullKey && v == value[n]) {
                 removeNullEntry();
@@ -255,7 +284,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
     }
 
     @Override
-    public boolean replace(final K k, final boolean oldValue, final boolean v) {
+    public boolean replace(final K k, final short oldValue, final short v) {
         int pos;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -269,7 +298,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
     }
 
     @Override
-    public boolean replace(final K k, final boolean v) {
+    public short replace(final K k, final short v) {
         int pos;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -278,13 +307,13 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
             pos = find(k, h);
         }
         if (pos < 0) return defRetValue;
-        final boolean oldValue = value[pos];
+        final short oldValue = value[pos];
         value[pos] = v;
         return oldValue;
     }
 
     @Override
-    public boolean computeIfAbsent(final K k, final java.util.function.Predicate<? super K> mappingFunction) {
+    public short computeIfAbsent(final K k, final ToIntFunction<? super K> mappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -293,13 +322,13 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
             pos = find(k, h);
         }
         if (pos >= 0) return value[pos];
-        final boolean newValue = mappingFunction.test(k);
+        final short newValue = it.unimi.dsi.fastutil.SafeMath.safeIntToShort(mappingFunction.applyAsInt(k));
         insert(-pos - 1, k, newValue, h);
         return newValue;
     }
 
     @Override
-    public boolean computeIfAbsent(final K k, final Object2BooleanFunction<? super K> mappingFunction) {
+    public short computeIfAbsent(final K k, final Object2ShortFunction<? super K> mappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -309,13 +338,13 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         }
         if (pos >= 0) return value[pos];
         if (!mappingFunction.containsKey(key)) return defRetValue;
-        final boolean newValue = mappingFunction.getBoolean(k);
+        final short newValue = mappingFunction.getShort(k);
         insert(-pos - 1, k, newValue, h);
         return newValue;
     }
 
     @Override
-    public boolean computeBooleanIfPresent(final K k, final BiFunction<? super K, ? super Boolean, ? extends Boolean> remappingFunction) {
+    public short computeShortIfPresent(final K k, final BiFunction<? super K, ? super Short, ? extends Short> remappingFunction) {
         int pos;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -324,7 +353,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
             pos = find(k, h);
         }
         if (pos < 0) return defRetValue;
-        final Boolean newValue = remappingFunction.apply((k), Boolean.valueOf(value[pos]));
+        final Short newValue = remappingFunction.apply((k), Short.valueOf(value[pos]));
         if (newValue == null) {
             if (k == null) removeNullEntry();
             else removeEntry(pos);
@@ -334,7 +363,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
     }
 
     @Override
-    public boolean computeBoolean(final K k, final BiFunction<? super K, ? super Boolean, ? extends Boolean> remappingFunction) {
+    public short computeShort(final K k, final BiFunction<? super K, ? super Short, ? extends Short> remappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -342,7 +371,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
             h = k.hashCode();
             pos = find(k, h);
         }
-        final Boolean newValue = remappingFunction.apply((k), pos >= 0 ? Boolean.valueOf(value[pos]) : null);
+        final Short newValue = remappingFunction.apply((k), pos >= 0 ? Short.valueOf(value[pos]) : null);
         if (newValue == null) {
             if (pos >= 0) {
                 if (k == null) removeNullEntry();
@@ -350,7 +379,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
             }
             return defRetValue;
         }
-        boolean newVal = newValue;
+        short newVal = newValue;
         if (pos < 0) {
             insert(-pos - 1, k, newVal, h);
             return newVal;
@@ -358,9 +387,9 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         return value[pos] = newVal;
     }
 
-
+    /** {@inheritDoc} */
     @Override
-    public boolean merge(final K k, final boolean v, final BiFunction<? super Boolean, ? super Boolean, ? extends Boolean> remappingFunction) {
+    public short mergeShort(final K k, final short v, it.unimi.dsi.fastutil.shorts.ShortBinaryOperator remappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
@@ -372,7 +401,24 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
             insert(-pos - 1, k, v, h);
             return v;
         }
-        final Boolean newValue = remappingFunction.apply(Boolean.valueOf(value[pos]), Boolean.valueOf(v));
+        final short newValue = remappingFunction.apply(value[pos], v);
+        return value[pos] = newValue;
+    }
+
+    @Override
+    public short merge(final K k, final short v, final BiFunction<? super Short, ? super Short, ? extends Short> remappingFunction) {
+        int pos, h = 0;
+        if (k == null) {
+            pos = containsNullKey ? n : -(n + 1);
+        } else {
+            h = k.hashCode();
+            pos = find(k, h);
+        }
+        if (pos < 0) {
+            insert(-pos - 1, k, v, h);
+            return v;
+        }
+        final Short newValue = remappingFunction.apply(Short.valueOf(value[pos]), Short.valueOf(v));
         if (newValue == null) {
             if (k == null) removeNullEntry();
             else removeEntry(pos);
@@ -390,7 +436,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         Arrays.fill(hash, 0);
     }
 
-    final class MapEntry implements Entry<K>, ObjectBooleanPair<K> {
+    final class MapEntry implements Entry<K>, ObjectShortPair<K> {
 
         int index;
 
@@ -411,51 +457,51 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         }
 
         @Override
-        public boolean getBooleanValue() {
+        public short getShortValue() {
             return value[index];
         }
 
         @Override
-        public boolean rightBoolean() {
+        public short rightShort() {
             return value[index];
         }
 
         @Override
-        public boolean setValue(final boolean v) {
-            final boolean oldValue = value[index];
+        public short setValue(final short v) {
+            final short oldValue = value[index];
             value[index] = v;
             return oldValue;
         }
 
         @Override
-        public ObjectBooleanPair<K> right(final boolean v) {
+        public ObjectShortPair<K> right(final short v) {
             value[index] = v;
             return this;
         }
 
         @Deprecated
         @Override
-        public Boolean getValue() {
+        public Short getValue() {
             return value[index];
         }
 
         @Deprecated
         @Override
-        public Boolean setValue(final Boolean v) {
-            return Boolean.valueOf(setValue((v).booleanValue()));
+        public Short setValue(final Short v) {
+            return Short.valueOf(setValue((v).shortValue()));
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public boolean equals(final Object o) {
             if (!(o instanceof Map.Entry)) return false;
-            Map.Entry<K, Boolean> e = (Map.Entry<K, Boolean>) o;
-            return java.util.Objects.equals(key[index], (e.getKey())) && ((value[index]) == ((e.getValue()).booleanValue()));
+            Map.Entry<K, Short> e = (Map.Entry<K, Short>) o;
+            return java.util.Objects.equals(key[index], (e.getKey())) && ((value[index]) == ((e.getValue()).shortValue()));
         }
 
         @Override
         public int hashCode() {
-            return hash[index] ^ (value[index] ? 1231 : 1237);
+            return hash[index] ^ value[index];
         }
 
         @Override
@@ -469,7 +515,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         int pos = n;
         int last = -1;
         int c = size;
-        boolean mustReturnNullKey = O2ZOpenCacheHashMap.this.containsNullKey;
+        boolean mustReturnNullKey = O2SOpenCacheHashMap.this.containsNullKey;
         ObjectArrayList<K> wrapped;
 
         abstract void acceptOnIndex(final ConsumerType action, final int index);
@@ -484,9 +530,9 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
                 mustReturnNullKey = false;
                 return last = n;
             }
-            final K[] key = O2ZOpenCacheHashMap.this.key;
-            final int[] hash = O2ZOpenCacheHashMap.this.hash;
-            final int mask = O2ZOpenCacheHashMap.this.mask;
+            final K[] key = O2SOpenCacheHashMap.this.key;
+            final int[] hash = O2SOpenCacheHashMap.this.hash;
+            final int mask = O2SOpenCacheHashMap.this.mask;
             for (;;) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
@@ -506,9 +552,9 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
                 acceptOnIndex(action, last = n);
                 c--;
             }
-            final K[] key = O2ZOpenCacheHashMap.this.key;
-            final int[] hash = O2ZOpenCacheHashMap.this.hash;
-            final int mask = O2ZOpenCacheHashMap.this.mask;
+            final K[] key = O2SOpenCacheHashMap.this.key;
+            final int[] hash = O2SOpenCacheHashMap.this.hash;
+            final int mask = O2SOpenCacheHashMap.this.mask;
             while (c != 0) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
@@ -528,10 +574,10 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         private void shiftKeys(int pos) {
             int last, slot, ch;
             K curr;
-            final K[] key = O2ZOpenCacheHashMap.this.key;
-            final boolean[] value = O2ZOpenCacheHashMap.this.value;
-            final int[] hash = O2ZOpenCacheHashMap.this.hash;
-            final int mask = O2ZOpenCacheHashMap.this.mask;
+            final K[] key = O2SOpenCacheHashMap.this.key;
+            final short[] value = O2SOpenCacheHashMap.this.value;
+            final int[] hash = O2SOpenCacheHashMap.this.hash;
+            final int mask = O2SOpenCacheHashMap.this.mask;
             for (;;) {
                 pos = ((last = pos) + 1) & mask;
                 for (;;) {
@@ -562,7 +608,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
                 hash[n] = 0;
             } else if (pos >= 0) shiftKeys(last);
             else {
-                O2ZOpenCacheHashMap.this.removeBoolean(wrapped.set(-pos - 1, null));
+                O2SOpenCacheHashMap.this.removeShort(wrapped.set(-pos - 1, null));
                 last = -1;
                 return;
             }
@@ -620,7 +666,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         int pos = 0;
         int max = n;
         int c = 0;
-        boolean mustReturnNull = O2ZOpenCacheHashMap.this.containsNullKey;
+        boolean mustReturnNull = O2SOpenCacheHashMap.this.containsNullKey;
         boolean hasSplit = false;
 
         MapSpliterator() {}
@@ -643,7 +689,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
                 acceptOnIndex(action, n);
                 return true;
             }
-            final K[] key = O2ZOpenCacheHashMap.this.key;
+            final K[] key = O2SOpenCacheHashMap.this.key;
             while (pos < max) {
                 if (!((key[pos]) == null)) {
                     ++c;
@@ -661,7 +707,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
                 ++c;
                 acceptOnIndex(action, n);
             }
-            final K[] key = O2ZOpenCacheHashMap.this.key;
+            final K[] key = O2SOpenCacheHashMap.this.key;
             while (pos < max) {
                 if (!((key[pos]) == null)) {
                     acceptOnIndex(action, pos);
@@ -700,7 +746,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
                 ++skipped;
                 --n;
             }
-            final K[] key = O2ZOpenCacheHashMap.this.key;
+            final K[] key = O2SOpenCacheHashMap.this.key;
             while (pos < max && n > 0) {
                 if (!((key[pos++]) == null)) {
                     ++skipped;
@@ -759,13 +805,13 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         public boolean contains(final Object o) {
             if (!(o instanceof Map.Entry)) return false;
             final Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
-            if (e.getValue() == null || !(e.getValue() instanceof Boolean)) return false;
+            if (e.getValue() == null || !(e.getValue() instanceof Short)) return false;
             final K k = ((K) e.getKey());
-            final boolean v = ((Boolean) (e.getValue())).booleanValue();
-            if (((k) == null)) return O2ZOpenCacheHashMap.this.containsNullKey && ((value[n]) == (v));
+            final short v = ((Short) (e.getValue())).shortValue();
+            if (((k) == null)) return O2SOpenCacheHashMap.this.containsNullKey && ((value[n]) == (v));
             K curr;
-            final K[] key = O2ZOpenCacheHashMap.this.key;
-            final int mask = O2ZOpenCacheHashMap.this.mask;
+            final K[] key = O2SOpenCacheHashMap.this.key;
+            final int mask = O2SOpenCacheHashMap.this.mask;
             int pos;
             if (((curr = key[pos = (HashCommon.mix((k).hashCode())) & mask]) == null)) return false;
             if (((k).equals(curr))) return ((value[pos]) == (v));
@@ -780,9 +826,9 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         public boolean remove(final Object o) {
             if (!(o instanceof Map.Entry)) return false;
             final Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
-            if (e.getValue() == null || !(e.getValue() instanceof Boolean)) return false;
+            if (e.getValue() == null || !(e.getValue() instanceof Short)) return false;
             final K k = ((K) e.getKey());
-            final boolean v = ((Boolean) (e.getValue())).booleanValue();
+            final short v = ((Short) (e.getValue())).shortValue();
             if (((k) == null)) {
                 if (containsNullKey && ((value[n]) == (v))) {
                     removeNullEntry();
@@ -791,8 +837,8 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
                 return false;
             }
             K curr;
-            final K[] key = O2ZOpenCacheHashMap.this.key;
-            final int mask = O2ZOpenCacheHashMap.this.mask;
+            final K[] key = O2SOpenCacheHashMap.this.key;
+            final int mask = O2SOpenCacheHashMap.this.mask;
             int pos;
             if (((curr = key[pos = (HashCommon.mix((k).hashCode())) & mask]) == null)) return false;
             if (((curr).equals(k))) {
@@ -820,13 +866,13 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
 
         @Override
         public void clear() {
-            O2ZOpenCacheHashMap.this.clear();
+            O2SOpenCacheHashMap.this.clear();
         }
 
         @Override
         public void forEach(final Consumer<? super Entry<K>> consumer) {
             if (containsNullKey) consumer.accept(new MapEntry(n));
-            final K[] key = O2ZOpenCacheHashMap.this.key;
+            final K[] key = O2SOpenCacheHashMap.this.key;
             for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) consumer.accept(new MapEntry(pos));
         }
 
@@ -838,7 +884,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
                 entry.index = n;
                 consumer.accept(entry);
             }
-            final K[] key = O2ZOpenCacheHashMap.this.key;
+            final K[] key = O2SOpenCacheHashMap.this.key;
             for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) {
                 entry.index = pos;
                 consumer.accept(entry);
@@ -847,7 +893,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
     }
 
     @Override
-    public FastEntrySet<K> object2BooleanEntrySet() {
+    public FastEntrySet<K> object2ShortEntrySet() {
         if (entries == null) entries = new MapEntrySet();
         return entries;
     }
@@ -910,7 +956,7 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         /** {@inheritDoc} */
         @Override
         public void forEach(final Consumer<? super K> consumer) {
-            final K[] key = O2ZOpenCacheHashMap.this.key;
+            final K[] key = O2SOpenCacheHashMap.this.key;
             if (containsNullKey) consumer.accept(key[n]);
             for (int pos = n; pos-- != 0;) {
                 final K k = key[pos];
@@ -931,13 +977,13 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         @Override
         public boolean remove(Object k) {
             final int oldSize = size;
-            O2ZOpenCacheHashMap.this.removeBoolean(k);
+            O2SOpenCacheHashMap.this.removeShort(k);
             return size != oldSize;
         }
 
         @Override
         public void clear() {
-            O2ZOpenCacheHashMap.this.clear();
+            O2SOpenCacheHashMap.this.clear();
         }
     }
 
@@ -947,26 +993,26 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
         return keys;
     }
 
-    private final class ValueIterator extends MapIterator<BooleanConsumer> implements BooleanIterator {
+    private final class ValueIterator extends MapIterator<ShortConsumer> implements ShortIterator {
 
         public ValueIterator() {
             super();
         }
 
         @Override
-        void acceptOnIndex(final BooleanConsumer action, final int index) {
+        void acceptOnIndex(final ShortConsumer action, final int index) {
             action.accept(value[index]);
         }
 
         @Override
-        public boolean nextBoolean() {
+        public short nextShort() {
             return value[nextEntry()];
         }
     }
 
-    private final class ValueSpliterator extends MapSpliterator<BooleanConsumer, ValueSpliterator> implements BooleanSpliterator {
+    private final class ValueSpliterator extends MapSpliterator<ShortConsumer, ValueSpliterator> implements ShortSpliterator {
 
-        private static final int POST_SPLIT_CHARACTERISTICS = BooleanSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
+        private static final int POST_SPLIT_CHARACTERISTICS = ShortSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
 
         ValueSpliterator() {}
 
@@ -976,11 +1022,11 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
 
         @Override
         public int characteristics() {
-            return hasSplit ? POST_SPLIT_CHARACTERISTICS : BooleanSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS;
+            return hasSplit ? POST_SPLIT_CHARACTERISTICS : ShortSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS;
         }
 
         @Override
-        void acceptOnIndex(final BooleanConsumer action, final int index) {
+        void acceptOnIndex(final ShortConsumer action, final int index) {
             action.accept(value[index]);
         }
 
@@ -991,24 +1037,24 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
     }
 
     @Override
-    public BooleanCollection values() {
-        if (values == null) values = new AbstractBooleanCollection() {
+    public ShortCollection values() {
+        if (values == null) values = new AbstractShortCollection() {
 
             @Override
-            public BooleanIterator iterator() {
+            public ShortIterator iterator() {
                 return new ValueIterator();
             }
 
             @Override
-            public BooleanSpliterator spliterator() {
+            public ShortSpliterator spliterator() {
                 return new ValueSpliterator();
             }
 
             /** {@inheritDoc} */
             @Override
-            public void forEach(final BooleanConsumer consumer) {
-                final K[] key = O2ZOpenCacheHashMap.this.key;
-                final boolean[] value = O2ZOpenCacheHashMap.this.value;
+            public void forEach(final ShortConsumer consumer) {
+                final K[] key = O2SOpenCacheHashMap.this.key;
+                final short[] value = O2SOpenCacheHashMap.this.value;
                 if (containsNullKey) consumer.accept(value[n]);
                 for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) consumer.accept(value[pos]);
             }
@@ -1019,13 +1065,13 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
             }
 
             @Override
-            public boolean contains(boolean v) {
+            public boolean contains(short v) {
                 return containsValue(v);
             }
 
             @Override
             public void clear() {
-                O2ZOpenCacheHashMap.this.clear();
+                O2SOpenCacheHashMap.this.clear();
             }
         };
         return values;
@@ -1034,11 +1080,11 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
     @SuppressWarnings("unchecked")
     protected void rehash(final int newN) {
         final K[] key = this.key;
-        final boolean[] value = this.value;
+        final short[] value = this.value;
         final int[] hash = this.hash;
         final int mask = newN - 1;
         final K[] newKey = (K[]) new Object[newN + 1];
-        final boolean[] newValue = new boolean[newN + 1];
+        final short[] newValue = new short[newN + 1];
         final int[] newHash = new int[newN + 1];
         int i = n, pos, h;
         for (int j = realSize(); j-- != 0;) {
@@ -1058,8 +1104,8 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
     }
 
     @Override
-    public O2ZOpenCacheHashMap<K> clone() {
-        O2ZOpenCacheHashMap<K> c = (O2ZOpenCacheHashMap<K>) super.clone();
+    public O2SOpenCacheHashMap<K> clone() {
+        O2SOpenCacheHashMap<K> c = (O2SOpenCacheHashMap<K>) super.clone();
         c.hash = hash.clone();
         return c;
     }
@@ -1068,16 +1114,16 @@ public final class O2ZOpenCacheHashMap<K> extends Object2BooleanOpenHashMap<K> {
     public int hashCode() {
         int h = 0;
         final K[] key = this.key;
-        final boolean[] value = this.value;
+        final short[] value = this.value;
         final int[] hash = this.hash;
         for (int j = realSize(), i = 0, t = 0; j-- != 0;) {
             while (((key[i]) == null)) i++;
             if (this != key[i]) t = hash[i];
-            t ^= (value[i] ? 1231 : 1237);
+            t ^= value[i];
             h += t;
             i++;
         }
-        if (containsNullKey) h += (value[n] ? 1231 : 1237);
+        if (containsNullKey) h += value[n];
         return h;
     }
 }

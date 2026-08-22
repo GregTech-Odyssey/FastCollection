@@ -1,68 +1,68 @@
-package com.gto.fastcollection;
+package com.gto.fastcollection.fastutil;
 
 import it.unimi.dsi.fastutil.HashCommon;
-import it.unimi.dsi.fastutil.longs.*;
+import it.unimi.dsi.fastutil.ints.*;
 import it.unimi.dsi.fastutil.objects.*;
 
 import java.util.Arrays;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
-import java.util.function.ToLongFunction;
+import java.util.function.ToIntFunction;
 
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 import static it.unimi.dsi.fastutil.HashCommon.maxFill;
 
-public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
+public final class O2IOpenCustomCacheHashMap<K> extends Object2IntOpenCustomHashMap<K> {
 
     private int[] hash;
 
-    public O2LOpenCacheHashMap(final int expected, final float f) {
-        super(expected, f);
+    public O2IOpenCustomCacheHashMap(final int expected, final float f, final Strategy<? super K> strategy) {
+        super(expected, f, strategy);
         hash = new int[n + 1];
     }
 
-    public O2LOpenCacheHashMap(final int expected) {
-        super(expected, DEFAULT_LOAD_FACTOR);
+    public O2IOpenCustomCacheHashMap(final int expected, final Strategy<? super K> strategy) {
+        super(expected, DEFAULT_LOAD_FACTOR, strategy);
         hash = new int[n + 1];
     }
 
-    public O2LOpenCacheHashMap() {
-        super(DEFAULT_INITIAL_SIZE, DEFAULT_LOAD_FACTOR);
+    public O2IOpenCustomCacheHashMap(final Strategy<? super K> strategy) {
+        super(DEFAULT_INITIAL_SIZE, DEFAULT_LOAD_FACTOR, strategy);
         hash = new int[n + 1];
     }
 
-    public O2LOpenCacheHashMap(final Map<? extends K, ? extends Long> m, final float f) {
-        super(m.size(), f);
-        hash = new int[n + 1];
-        putAll(m);
-    }
-
-    public O2LOpenCacheHashMap(final Map<? extends K, ? extends Long> m) {
-        this(m, DEFAULT_LOAD_FACTOR);
-    }
-
-    public O2LOpenCacheHashMap(final Object2LongMap<K> m, final float f) {
-        super(m.size(), f);
+    public O2IOpenCustomCacheHashMap(final Map<? extends K, ? extends Integer> m, final float f, final Strategy<? super K> strategy) {
+        super(m.size(), f, strategy);
         hash = new int[n + 1];
         putAll(m);
     }
 
-    public O2LOpenCacheHashMap(final Object2LongMap<K> m) {
-        this(m, DEFAULT_LOAD_FACTOR);
+    public O2IOpenCustomCacheHashMap(final Map<? extends K, ? extends Integer> m, final Strategy<? super K> strategy) {
+        this(m, DEFAULT_LOAD_FACTOR, strategy);
+    }
+
+    public O2IOpenCustomCacheHashMap(final Object2IntMap<K> m, final float f, final Strategy<? super K> strategy) {
+        super(m.size(), f, strategy);
+        hash = new int[n + 1];
+        putAll(m);
+    }
+
+    public O2IOpenCustomCacheHashMap(final Object2IntMap<K> m, final Strategy<? super K> strategy) {
+        this(m, DEFAULT_LOAD_FACTOR, strategy);
     }
 
     private int realSize() {
         return containsNullKey ? size - 1 : size;
     }
 
-    private long removeEntry(int pos) {
-        final long oldValue = value[pos];
+    private int removeEntry(int pos) {
+        final int oldValue = value[pos];
         size--;
         int last, slot, ch;
         K curr;
         final K[] key = this.key;
-        final long[] value = this.value;
+        final int[] value = this.value;
         final int[] hash = this.hash;
         final int mask = this.mask;
         a:
@@ -88,11 +88,11 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         return oldValue;
     }
 
-    private long removeNullEntry() {
+    private int removeNullEntry() {
         containsNullKey = false;
         key[n] = null;
         hash[n] = 0;
-        final long oldValue = value[n];
+        final int oldValue = value[n];
         size--;
         if (n > minN && size < maxFill / 4 && n > DEFAULT_INITIAL_SIZE) rehash(n / 2);
         return oldValue;
@@ -105,14 +105,14 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         final int mask = this.mask;
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return -(pos + 1);
-        if (hash[pos] == h && k.equals(curr)) return pos;
+        if (hash[pos] == h && strategy.equals(k, curr)) return pos;
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return -(pos + 1);
-            if (hash[pos] == h && k.equals(curr)) return pos;
+            if (hash[pos] == h && strategy.equals(k, curr)) return pos;
         }
     }
 
-    private void insert(final int pos, final K k, final long v, final int h) {
+    private void insert(final int pos, final K k, final int v, final int h) {
         if (pos == n) containsNullKey = true;
         key[pos] = k;
         value[pos] = v;
@@ -121,44 +121,44 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
     }
 
     @Override
-    public long put(final K k, final long v) {
+    public int put(final K k, final int v) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            h = k.hashCode();
+            h = strategy.hashCode(k);
             pos = find(k, h);
         }
         if (pos < 0) {
             insert(-pos - 1, k, v, h);
             return defRetValue;
         }
-        final long oldValue = value[pos];
+        final int oldValue = value[pos];
         value[pos] = v;
         return oldValue;
     }
 
-    private long addToValue(final int pos, final long incr) {
-        final long oldValue = value[pos];
+    private int addToValue(final int pos, final int incr) {
+        final int oldValue = value[pos];
         value[pos] = oldValue + incr;
         return oldValue;
     }
 
     @Override
-    public long addTo(final K k, final long incr) {
+    public int addTo(final K k, final int incr) {
         int pos, h = 0;
         if (k == null) {
             if (containsNullKey) return addToValue(n, incr);
             pos = n;
             containsNullKey = true;
         } else {
-            h = k.hashCode();
+            h = strategy.hashCode(k);
             K curr;
             final K[] key = this.key;
             final int[] hash = this.hash;
             final int mask = this.mask;
             if ((curr = key[pos = HashCommon.mix(h) & mask]) != null) {
-                do if (hash[pos] == h && curr.equals(k)) return addToValue(pos, incr);
+                do if (hash[pos] == h && strategy.equals(k, curr)) return addToValue(pos, incr);
                 while ((curr = key[pos = (pos + 1) & mask]) != null);
             }
         }
@@ -170,83 +170,87 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
     }
 
     @Override
-    public long removeLong(final Object k) {
+    public int removeInt(final Object k) {
         if (k == null) {
             if (containsNullKey) return removeNullEntry();
             return defRetValue;
         }
         K curr;
+        K fk = (K) k;
         final K[] key = this.key;
         final int[] hash = this.hash;
         final int mask = this.mask;
-        final int h = k.hashCode();
+        final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defRetValue;
-        if (hash[pos] == h && k.equals(curr)) return removeEntry(pos);
+        if (hash[pos] == h && strategy.equals(fk, curr)) return removeEntry(pos);
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return defRetValue;
-            if (hash[pos] == h && k.equals(curr)) return removeEntry(pos);
+            if (hash[pos] == h && strategy.equals(fk, curr)) return removeEntry(pos);
         }
     }
 
     @Override
-    public long getLong(final Object k) {
+    public int getInt(final Object k) {
         if (k == null) return containsNullKey ? value[n] : defRetValue;
+        K fk = (K) k;
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
         final int mask = this.mask;
-        final int h = k.hashCode();
+        final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defRetValue;
-        if (hash[pos] == h && k.equals(curr)) return value[pos];
+        if (hash[pos] == h && strategy.equals(fk, curr)) return value[pos];
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return defRetValue;
-            if (hash[pos] == h && k.equals(curr)) return value[pos];
+            if (hash[pos] == h && strategy.equals(fk, curr)) return value[pos];
         }
     }
 
     @Override
     public boolean containsKey(final Object k) {
         if (k == null) return containsNullKey;
+        K fk = (K) k;
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
         final int mask = this.mask;
-        final int h = k.hashCode();
+        final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
-        if (hash[pos] == h && k.equals(curr)) return true;
+        if (hash[pos] == h && strategy.equals(fk, curr)) return true;
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return false;
-            if (hash[pos] == h && k.equals(curr)) return true;
+            if (hash[pos] == h && strategy.equals(fk, curr)) return true;
         }
     }
 
     @Override
-    public long getOrDefault(final Object k, final long defaultValue) {
+    public int getOrDefault(final Object k, final int defaultValue) {
         if (k == null) return containsNullKey ? value[n] : defaultValue;
+        K fk = (K) k;
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
         final int mask = this.mask;
-        final int h = k.hashCode();
+        final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return defaultValue;
-        if (hash[pos] == h && k.equals(curr)) return value[pos];
+        if (hash[pos] == h && strategy.equals(fk, curr)) return value[pos];
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return defaultValue;
-            if (hash[pos] == h && k.equals(curr)) return value[pos];
+            if (hash[pos] == h && strategy.equals(fk, curr)) return value[pos];
         }
     }
 
     @Override
-    public long putIfAbsent(final K k, final long v) {
+    public int putIfAbsent(final K k, final int v) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            h = k.hashCode();
+            h = strategy.hashCode(k);
             pos = find(k, h);
         }
         if (pos >= 0) return value[pos];
@@ -255,7 +259,7 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
     }
 
     @Override
-    public boolean remove(final Object k, final long v) {
+    public boolean remove(final Object k, final int v) {
         if (k == null) {
             if (containsNullKey && v == value[n]) {
                 removeNullEntry();
@@ -263,20 +267,21 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
             }
             return false;
         }
+        K fk = (K) k;
         K curr;
         final K[] key = this.key;
         final int[] hash = this.hash;
         final int mask = this.mask;
-        final int h = k.hashCode();
+        final int h = strategy.hashCode(fk);
         int pos;
         if ((curr = key[pos = HashCommon.mix(h) & mask]) == null) return false;
-        if (hash[pos] == h && k.equals(curr) && v == value[pos]) {
+        if (hash[pos] == h && strategy.equals(fk, curr) && v == value[pos]) {
             removeEntry(pos);
             return true;
         }
         while (true) {
             if ((curr = key[pos = (pos + 1) & mask]) == null) return false;
-            if (hash[pos] == h && k.equals(curr) && v == value[pos]) {
+            if (hash[pos] == h && strategy.equals(fk, curr) && v == value[pos]) {
                 removeEntry(pos);
                 return true;
             }
@@ -284,12 +289,12 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
     }
 
     @Override
-    public boolean replace(final K k, final long oldValue, final long v) {
+    public boolean replace(final K k, final int oldValue, final int v) {
         int pos;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            int h = k.hashCode();
+            int h = strategy.hashCode(k);
             pos = find(k, h);
         }
         if (pos < 0 || oldValue != value[pos]) return false;
@@ -298,62 +303,62 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
     }
 
     @Override
-    public long replace(final K k, final long v) {
+    public int replace(final K k, final int v) {
         int pos;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            int h = k.hashCode();
+            int h = strategy.hashCode(k);
             pos = find(k, h);
         }
         if (pos < 0) return defRetValue;
-        final long oldValue = value[pos];
+        final int oldValue = value[pos];
         value[pos] = v;
         return oldValue;
     }
 
     @Override
-    public long computeIfAbsent(final K k, final ToLongFunction<? super K> mappingFunction) {
+    public int computeIfAbsent(final K k, final ToIntFunction<? super K> mappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            h = k.hashCode();
+            h = strategy.hashCode(k);
             pos = find(k, h);
         }
         if (pos >= 0) return value[pos];
-        final long newValue = mappingFunction.applyAsLong(k);
+        final int newValue = mappingFunction.applyAsInt(k);
         insert(-pos - 1, k, newValue, h);
         return newValue;
     }
 
     @Override
-    public long computeIfAbsent(final K k, final Object2LongFunction<? super K> mappingFunction) {
+    public int computeIfAbsent(final K k, final Object2IntFunction<? super K> mappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            h = k.hashCode();
+            h = strategy.hashCode(k);
             pos = find(k, h);
         }
         if (pos >= 0) return value[pos];
         if (!mappingFunction.containsKey(key)) return defRetValue;
-        final long newValue = mappingFunction.applyAsLong(k);
+        final int newValue = mappingFunction.applyAsInt(k);
         insert(-pos - 1, k, newValue, h);
         return newValue;
     }
 
     @Override
-    public long computeLongIfPresent(final K k, final BiFunction<? super K, ? super Long, ? extends Long> remappingFunction) {
+    public int computeIntIfPresent(final K k, final BiFunction<? super K, ? super Integer, ? extends Integer> remappingFunction) {
         int pos;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            int h = k.hashCode();
+            int h = strategy.hashCode(k);
             pos = find(k, h);
         }
         if (pos < 0) return defRetValue;
-        final Long newValue = remappingFunction.apply((k), value[pos]);
+        final Integer newValue = remappingFunction.apply((k), value[pos]);
         if (newValue == null) {
             if (k == null) removeNullEntry();
             else removeEntry(pos);
@@ -363,15 +368,15 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
     }
 
     @Override
-    public long computeLong(final K k, final BiFunction<? super K, ? super Long, ? extends Long> remappingFunction) {
+    public int computeInt(final K k, final BiFunction<? super K, ? super Integer, ? extends Integer> remappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            h = k.hashCode();
+            h = strategy.hashCode(k);
             pos = find(k, h);
         }
-        final Long newValue = remappingFunction.apply((k), pos >= 0 ? value[pos] : null);
+        final Integer newValue = remappingFunction.apply((k), pos >= 0 ? value[pos] : null);
         if (newValue == null) {
             if (pos >= 0) {
                 if (k == null) removeNullEntry();
@@ -379,7 +384,7 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
             }
             return defRetValue;
         }
-        long newVal = newValue;
+        int newVal = newValue;
         if (pos < 0) {
             insert(-pos - 1, k, newVal, h);
             return newVal;
@@ -389,36 +394,36 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
 
     /** {@inheritDoc} */
     @Override
-    public long mergeLong(final K k, final long v, java.util.function.LongBinaryOperator remappingFunction) {
+    public int mergeInt(final K k, final int v, java.util.function.IntBinaryOperator remappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            h = k.hashCode();
+            h = strategy.hashCode(k);
             pos = find(k, h);
         }
         if (pos < 0) {
             insert(-pos - 1, k, v, h);
             return v;
         }
-        final long newValue = remappingFunction.applyAsLong(value[pos], v);
+        final int newValue = remappingFunction.applyAsInt(value[pos], v);
         return value[pos] = newValue;
     }
 
     @Override
-    public long merge(final K k, final long v, final BiFunction<? super Long, ? super Long, ? extends Long> remappingFunction) {
+    public int merge(final K k, final int v, final BiFunction<? super Integer, ? super Integer, ? extends Integer> remappingFunction) {
         int pos, h = 0;
         if (k == null) {
             pos = containsNullKey ? n : -(n + 1);
         } else {
-            h = k.hashCode();
+            h = strategy.hashCode(k);
             pos = find(k, h);
         }
         if (pos < 0) {
             insert(-pos - 1, k, v, h);
             return v;
         }
-        final Long newValue = remappingFunction.apply(value[pos], v);
+        final Integer newValue = remappingFunction.apply(value[pos], v);
         if (newValue == null) {
             if (k == null) removeNullEntry();
             else removeEntry(pos);
@@ -436,7 +441,7 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         Arrays.fill(hash, 0);
     }
 
-    final class MapEntry implements Entry<K>, ObjectLongPair<K> {
+    final class MapEntry implements Entry<K>, ObjectIntPair<K> {
 
         int index;
 
@@ -457,51 +462,51 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         }
 
         @Override
-        public long getLongValue() {
+        public int getIntValue() {
             return value[index];
         }
 
         @Override
-        public long rightLong() {
+        public int rightInt() {
             return value[index];
         }
 
         @Override
-        public long setValue(final long v) {
-            final long oldValue = value[index];
+        public int setValue(final int v) {
+            final int oldValue = value[index];
             value[index] = v;
             return oldValue;
         }
 
         @Override
-        public ObjectLongPair<K> right(final long v) {
+        public ObjectIntPair<K> right(final int v) {
             value[index] = v;
             return this;
         }
 
         @Deprecated
         @Override
-        public Long getValue() {
+        public Integer getValue() {
             return value[index];
         }
 
         @Deprecated
         @Override
-        public Long setValue(final Long v) {
-            return setValue((v).longValue());
+        public Integer setValue(final Integer v) {
+            return setValue((v).intValue());
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public boolean equals(final Object o) {
             if (!(o instanceof Map.Entry)) return false;
-            Map.Entry<K, Long> e = (Map.Entry<K, Long>) o;
-            return java.util.Objects.equals(key[index], (e.getKey())) && ((value[index]) == (e.getValue()));
+            Map.Entry<K, Integer> e = (Map.Entry<K, Integer>) o;
+            return strategy.equals(key[index], (e.getKey())) && ((value[index]) == (e.getValue()));
         }
 
         @Override
         public int hashCode() {
-            return hash[index] ^ HashCommon.long2int(value[index]);
+            return hash[index] ^ value[index];
         }
 
         @Override
@@ -515,7 +520,7 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         int pos = n;
         int last = -1;
         int c = size;
-        boolean mustReturnNullKey = O2LOpenCacheHashMap.this.containsNullKey;
+        boolean mustReturnNullKey = O2IOpenCustomCacheHashMap.this.containsNullKey;
         ObjectArrayList<K> wrapped;
 
         abstract void acceptOnIndex(final ConsumerType action, final int index);
@@ -530,16 +535,16 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
                 mustReturnNullKey = false;
                 return last = n;
             }
-            final K[] key = O2LOpenCacheHashMap.this.key;
-            final int[] hash = O2LOpenCacheHashMap.this.hash;
-            final int mask = O2LOpenCacheHashMap.this.mask;
+            final K[] key = O2IOpenCustomCacheHashMap.this.key;
+            final int[] hash = O2IOpenCustomCacheHashMap.this.hash;
+            final int mask = O2IOpenCustomCacheHashMap.this.mask;
             for (;;) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
                     final K k = wrapped.get(-pos - 1);
-                    final int h = k.hashCode();
+                    final int h = strategy.hashCode(k);
                     int p = HashCommon.mix(h) & mask;
-                    while (!(hash[p] == h && k.equals(key[p]))) p = (p + 1) & mask;
+                    while (!(hash[p] == h && strategy.equals(key[p], k))) p = (p + 1) & mask;
                     return p;
                 }
                 if (!((key[pos]) == null)) return last = pos;
@@ -552,15 +557,15 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
                 acceptOnIndex(action, last = n);
                 c--;
             }
-            final K[] key = O2LOpenCacheHashMap.this.key;
-            final int[] hash = O2LOpenCacheHashMap.this.hash;
+            final K[] key = O2IOpenCustomCacheHashMap.this.key;
+            final int[] hash = O2IOpenCustomCacheHashMap.this.hash;
             while (c != 0) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
                     final K k = wrapped.get(-pos - 1);
-                    final int h = k.hashCode();
+                    final int h = strategy.hashCode(k);
                     int p = HashCommon.mix(h) & mask;
-                    while (!(hash[p] == h && k.equals(key[p]))) p = (p + 1) & mask;
+                    while (!(hash[p] == h && strategy.equals(key[p], k))) p = (p + 1) & mask;
                     acceptOnIndex(action, p);
                     c--;
                 } else if (!((key[pos]) == null)) {
@@ -573,10 +578,10 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         private void shiftKeys(int pos) {
             int last, slot, ch;
             K curr;
-            final K[] key = O2LOpenCacheHashMap.this.key;
-            final long[] value = O2LOpenCacheHashMap.this.value;
-            final int[] hash = O2LOpenCacheHashMap.this.hash;
-            final int mask = O2LOpenCacheHashMap.this.mask;
+            final K[] key = O2IOpenCustomCacheHashMap.this.key;
+            final int[] value = O2IOpenCustomCacheHashMap.this.value;
+            final int[] hash = O2IOpenCustomCacheHashMap.this.hash;
+            final int mask = O2IOpenCustomCacheHashMap.this.mask;
             for (;;) {
                 pos = ((last = pos) + 1) & mask;
                 for (;;) {
@@ -607,7 +612,7 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
                 hash[n] = 0;
             } else if (pos >= 0) shiftKeys(last);
             else {
-                O2LOpenCacheHashMap.this.removeLong(wrapped.set(-pos - 1, null));
+                O2IOpenCustomCacheHashMap.this.removeInt(wrapped.set(-pos - 1, null));
                 last = -1;
                 return;
             }
@@ -665,7 +670,7 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         int pos = 0;
         int max = n;
         int c = 0;
-        boolean mustReturnNull = O2LOpenCacheHashMap.this.containsNullKey;
+        boolean mustReturnNull = O2IOpenCustomCacheHashMap.this.containsNullKey;
         boolean hasSplit = false;
 
         MapSpliterator() {}
@@ -688,7 +693,7 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
                 acceptOnIndex(action, n);
                 return true;
             }
-            final K[] key = O2LOpenCacheHashMap.this.key;
+            final K[] key = O2IOpenCustomCacheHashMap.this.key;
             while (pos < max) {
                 if (!((key[pos]) == null)) {
                     ++c;
@@ -706,7 +711,7 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
                 ++c;
                 acceptOnIndex(action, n);
             }
-            final K[] key = O2LOpenCacheHashMap.this.key;
+            final K[] key = O2IOpenCustomCacheHashMap.this.key;
             while (pos < max) {
                 if (!((key[pos]) == null)) {
                     acceptOnIndex(action, pos);
@@ -737,15 +742,15 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
             return split;
         }
 
-        public long skip(long n) {
+        public int skip(int n) {
             if (n == 0) return 0;
-            long skipped = 0;
+            int skipped = 0;
             if (mustReturnNull) {
                 mustReturnNull = false;
                 ++skipped;
                 --n;
             }
-            final K[] key = O2LOpenCacheHashMap.this.key;
+            final K[] key = O2IOpenCustomCacheHashMap.this.key;
             while (pos < max && n > 0) {
                 if (!((key[pos++]) == null)) {
                     ++skipped;
@@ -804,19 +809,19 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         public boolean contains(final Object o) {
             if (!(o instanceof Map.Entry)) return false;
             final Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
-            if (e.getValue() == null || !(e.getValue() instanceof Long)) return false;
+            if (e.getValue() == null || !(e.getValue() instanceof Integer)) return false;
             final K k = ((K) e.getKey());
-            final long v = (Long) (e.getValue());
-            if (((k) == null)) return O2LOpenCacheHashMap.this.containsNullKey && ((value[n]) == (v));
+            final int v = (Integer) (e.getValue());
+            if (((k) == null)) return O2IOpenCustomCacheHashMap.this.containsNullKey && ((value[n]) == (v));
             K curr;
-            final K[] key = O2LOpenCacheHashMap.this.key;
-            final int mask = O2LOpenCacheHashMap.this.mask;
+            final K[] key = O2IOpenCustomCacheHashMap.this.key;
+            final int mask = O2IOpenCustomCacheHashMap.this.mask;
             int pos;
-            if (((curr = key[pos = (HashCommon.mix((k).hashCode())) & mask]) == null)) return false;
-            if (((k).equals(curr))) return ((value[pos]) == (v));
+            if (((curr = key[pos = (HashCommon.mix(strategy.hashCode(k))) & mask]) == null)) return false;
+            if (strategy.equals(k, curr)) return ((value[pos]) == (v));
             while (true) {
                 if (((curr = key[pos = (pos + 1) & mask]) == null)) return false;
-                if (((k).equals(curr))) return ((value[pos]) == (v));
+                if (strategy.equals(k, curr)) return ((value[pos]) == (v));
             }
         }
 
@@ -825,9 +830,9 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         public boolean remove(final Object o) {
             if (!(o instanceof Map.Entry)) return false;
             final Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
-            if (e.getValue() == null || !(e.getValue() instanceof Long)) return false;
+            if (e.getValue() == null || !(e.getValue() instanceof Integer)) return false;
             final K k = ((K) e.getKey());
-            final long v = (Long) (e.getValue());
+            final int v = (Integer) (e.getValue());
             if (((k) == null)) {
                 if (containsNullKey && ((value[n]) == (v))) {
                     removeNullEntry();
@@ -836,11 +841,11 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
                 return false;
             }
             K curr;
-            final K[] key = O2LOpenCacheHashMap.this.key;
-            final int mask = O2LOpenCacheHashMap.this.mask;
+            final K[] key = O2IOpenCustomCacheHashMap.this.key;
+            final int mask = O2IOpenCustomCacheHashMap.this.mask;
             int pos;
-            if (((curr = key[pos = (HashCommon.mix((k).hashCode())) & mask]) == null)) return false;
-            if (((curr).equals(k))) {
+            if (((curr = key[pos = (HashCommon.mix(strategy.hashCode(k))) & mask]) == null)) return false;
+            if (strategy.equals(k, curr)) {
                 if (((value[pos]) == (v))) {
                     removeEntry(pos);
                     return true;
@@ -849,7 +854,7 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
             }
             while (true) {
                 if (((curr = key[pos = (pos + 1) & mask]) == null)) return false;
-                if (((curr).equals(k))) {
+                if (strategy.equals(k, curr)) {
                     if (((value[pos]) == (v))) {
                         removeEntry(pos);
                         return true;
@@ -865,13 +870,13 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
 
         @Override
         public void clear() {
-            O2LOpenCacheHashMap.this.clear();
+            O2IOpenCustomCacheHashMap.this.clear();
         }
 
         @Override
         public void forEach(final Consumer<? super Entry<K>> consumer) {
             if (containsNullKey) consumer.accept(new MapEntry(n));
-            final K[] key = O2LOpenCacheHashMap.this.key;
+            final K[] key = O2IOpenCustomCacheHashMap.this.key;
             for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) consumer.accept(new MapEntry(pos));
         }
 
@@ -883,7 +888,7 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
                 entry.index = n;
                 consumer.accept(entry);
             }
-            final K[] key = O2LOpenCacheHashMap.this.key;
+            final K[] key = O2IOpenCustomCacheHashMap.this.key;
             for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) {
                 entry.index = pos;
                 consumer.accept(entry);
@@ -892,7 +897,7 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
     }
 
     @Override
-    public FastEntrySet<K> object2LongEntrySet() {
+    public FastEntrySet<K> object2IntEntrySet() {
         if (entries == null) entries = new MapEntrySet();
         return entries;
     }
@@ -955,7 +960,7 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         /** {@inheritDoc} */
         @Override
         public void forEach(final Consumer<? super K> consumer) {
-            final K[] key = O2LOpenCacheHashMap.this.key;
+            final K[] key = O2IOpenCustomCacheHashMap.this.key;
             if (containsNullKey) consumer.accept(key[n]);
             for (int pos = n; pos-- != 0;) {
                 final K k = key[pos];
@@ -976,13 +981,13 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         @Override
         public boolean remove(Object k) {
             final int oldSize = size;
-            O2LOpenCacheHashMap.this.removeLong(k);
+            O2IOpenCustomCacheHashMap.this.removeInt(k);
             return size != oldSize;
         }
 
         @Override
         public void clear() {
-            O2LOpenCacheHashMap.this.clear();
+            O2IOpenCustomCacheHashMap.this.clear();
         }
     }
 
@@ -992,26 +997,26 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         return keys;
     }
 
-    private final class ValueIterator extends MapIterator<java.util.function.LongConsumer> implements LongIterator {
+    private final class ValueIterator extends MapIterator<java.util.function.IntConsumer> implements IntIterator {
 
         public ValueIterator() {
             super();
         }
 
         @Override
-        void acceptOnIndex(final java.util.function.LongConsumer action, final int index) {
+        void acceptOnIndex(final java.util.function.IntConsumer action, final int index) {
             action.accept(value[index]);
         }
 
         @Override
-        public long nextLong() {
+        public int nextInt() {
             return value[nextEntry()];
         }
     }
 
-    private final class ValueSpliterator extends MapSpliterator<java.util.function.LongConsumer, ValueSpliterator> implements LongSpliterator {
+    private final class ValueSpliterator extends MapSpliterator<java.util.function.IntConsumer, ValueSpliterator> implements IntSpliterator {
 
-        private static final int POST_SPLIT_CHARACTERISTICS = LongSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
+        private static final int POST_SPLIT_CHARACTERISTICS = IntSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
 
         ValueSpliterator() {}
 
@@ -1021,11 +1026,11 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
 
         @Override
         public int characteristics() {
-            return hasSplit ? POST_SPLIT_CHARACTERISTICS : LongSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS;
+            return hasSplit ? POST_SPLIT_CHARACTERISTICS : IntSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS;
         }
 
         @Override
-        void acceptOnIndex(final java.util.function.LongConsumer action, final int index) {
+        void acceptOnIndex(final java.util.function.IntConsumer action, final int index) {
             action.accept(value[index]);
         }
 
@@ -1036,24 +1041,24 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
     }
 
     @Override
-    public LongCollection values() {
-        if (values == null) values = new AbstractLongCollection() {
+    public IntCollection values() {
+        if (values == null) values = new AbstractIntCollection() {
 
             @Override
-            public LongIterator iterator() {
+            public IntIterator iterator() {
                 return new ValueIterator();
             }
 
             @Override
-            public LongSpliterator spliterator() {
+            public IntSpliterator spliterator() {
                 return new ValueSpliterator();
             }
 
             /** {@inheritDoc} */
             @Override
-            public void forEach(final java.util.function.LongConsumer consumer) {
-                final K[] key = O2LOpenCacheHashMap.this.key;
-                final long[] value = O2LOpenCacheHashMap.this.value;
+            public void forEach(final java.util.function.IntConsumer consumer) {
+                final K[] key = O2IOpenCustomCacheHashMap.this.key;
+                final int[] value = O2IOpenCustomCacheHashMap.this.value;
                 if (containsNullKey) consumer.accept(value[n]);
                 for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) consumer.accept(value[pos]);
             }
@@ -1064,13 +1069,13 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
             }
 
             @Override
-            public boolean contains(long v) {
+            public boolean contains(int v) {
                 return containsValue(v);
             }
 
             @Override
             public void clear() {
-                O2LOpenCacheHashMap.this.clear();
+                O2IOpenCustomCacheHashMap.this.clear();
             }
         };
         return values;
@@ -1079,11 +1084,11 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
     @SuppressWarnings("unchecked")
     protected void rehash(final int newN) {
         final K[] key = this.key;
-        final long[] value = this.value;
+        final int[] value = this.value;
         final int[] hash = this.hash;
         final int mask = newN - 1;
         final K[] newKey = (K[]) new Object[newN + 1];
-        final long[] newValue = new long[newN + 1];
+        final int[] newValue = new int[newN + 1];
         final int[] newHash = new int[newN + 1];
         int i = n, pos, h;
         for (int j = realSize(); j-- != 0;) {
@@ -1103,8 +1108,8 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
     }
 
     @Override
-    public O2LOpenCacheHashMap<K> clone() {
-        O2LOpenCacheHashMap<K> c = (O2LOpenCacheHashMap<K>) super.clone();
+    public O2IOpenCustomCacheHashMap<K> clone() {
+        O2IOpenCustomCacheHashMap<K> c = (O2IOpenCustomCacheHashMap<K>) super.clone();
         c.hash = hash.clone();
         return c;
     }
@@ -1113,16 +1118,16 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
     public int hashCode() {
         int h = 0;
         final K[] key = this.key;
-        final long[] value = this.value;
+        final int[] value = this.value;
         final int[] hash = this.hash;
         for (int j = realSize(), i = 0, t = 0; j-- != 0;) {
             while (((key[i]) == null)) i++;
             if (this != key[i]) t = hash[i];
-            t ^= HashCommon.long2int(value[i]);
+            t ^= value[i];
             h += t;
             i++;
         }
-        if (containsNullKey) h += HashCommon.long2int(value[n]);
+        if (containsNullKey) h += value[n];
         return h;
     }
 }

@@ -1,6 +1,7 @@
 package com.gto.fastcollection.cache;
 
 import it.unimi.dsi.fastutil.Hash;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -16,13 +17,14 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Verifies the reentrant {@link MapCache#getCacheRecursive} API: the create
  * function runs outside any internal lock, so it may call back into the same
  * cache to resolve dependencies. Values already present are reused without
- * re-running the function, a {@code null} result is not cached, and concurrent
- * computations of one key converge to a single stored value (first one wins).
+ * re-running the function, and concurrent computations of one key converge to
+ * a single stored value (first one wins).
  */
 class MapCacheRecursiveTest {
 
@@ -80,6 +82,38 @@ class MapCacheRecursiveTest {
         assertThat(cache.getIfPresent("child")).isEqualTo("root-child");
     }
 
+    /** Single-segment variants: recursive keys necessarily share the one segment. */
+    static Stream<Arguments> singleSegmentCaches() {
+        return Stream.of(
+                Arguments.of("HashCache", (Supplier<MapCache<String, String>>) HashCache::new),
+                Arguments.of("IdentityHashCache", (Supplier<MapCache<String, String>>) () -> new IdentityHashCache<>(1)),
+                Arguments.of("CustomHashCache",
+                        (Supplier<MapCache<String, String>>) () -> new CustomHashCache<>(VALUE_STRATEGY, 1)),
+                Arguments.of("WeakValueHashCache", (Supplier<MapCache<String, String>>) () -> new WeakValueHashCache<>(1)),
+                Arguments.of("WeakValueIdentityHashCache",
+                        (Supplier<MapCache<String, String>>) () -> new WeakValueIdentityHashCache<>(1)),
+                Arguments.of("WeakValueCustomHashCache",
+                        (Supplier<MapCache<String, String>>) () -> new WeakValueCustomHashCache<>(VALUE_STRATEGY, 1)));
+    }
+
+    @ParameterizedTest(name = "{0} [single segment]")
+    @MethodSource("singleSegmentCaches")
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    void recursiveResolvesDependenciesWhenKeysShareOneSegment(String name, Supplier<MapCache<String, String>> factory) {
+        MapCache<String, String> cache = factory.get();
+
+        // with a single segment the inner call necessarily re-enters the segment
+        // the outer computation is running in, so the function must never hold a lock
+        String child = cache.getCacheRecursive("child", k -> {
+            String parent = cache.getCacheRecursive("parent", kk -> "root");
+            return parent + "-child";
+        });
+
+        assertThat(child).isEqualTo("root-child");
+        assertThat(cache.getIfPresent("parent")).isEqualTo("root");
+        assertThat(cache.getIfPresent("child")).isEqualTo("root-child");
+    }
+
     @ParameterizedTest(name = "{0}")
     @MethodSource("caches")
     void recursiveReusesCachedValueWithoutRerunning(String name, Supplier<MapCache<String, String>> factory,
@@ -109,27 +143,6 @@ class MapCacheRecursiveTest {
         assertThat(cache.getCacheRecursive("key")).isEqualTo("cf:key");
         // cached: the constructor function must not run again
         assertThat(cache.getCacheRecursive("key")).isEqualTo("cf:key");
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("caches")
-    void recursiveNullResultIsNotCached(String name, Supplier<MapCache<String, String>> factory,
-                                        Function<Function<String, String>, MapCache<String, String>> withFunction) {
-        MapCache<String, String> cache = factory.get();
-        AtomicInteger calls = new AtomicInteger();
-
-        assertThat(cache.getCacheRecursive("k", k -> {
-            calls.incrementAndGet();
-            return null;
-        })).isNull();
-        // nothing was stored, so the next call runs the function again
-        assertThat(cache.getCacheRecursive("k", k -> {
-            calls.incrementAndGet();
-            return null;
-        })).isNull();
-
-        assertThat(calls.get()).isEqualTo(2);
-        assertThat(cache.getIfPresent("k")).isNull();
     }
 
     @ParameterizedTest(name = "{0}")

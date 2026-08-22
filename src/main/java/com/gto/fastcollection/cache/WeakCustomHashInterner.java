@@ -1,5 +1,6 @@
 package com.gto.fastcollection.cache;
 
+import com.gto.fastcollection.Concurrents;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 
@@ -16,16 +17,13 @@ import static it.unimi.dsi.fastutil.HashCommon.arraySize;
  *
  * <p>Registered with {@link CacheCleaner} for periodic dead-entry sweeping.
  */
-public final class WeakCustomHashInterner<T> implements Interner<T>, ICleanableCache {
+public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInterner.Segment<T>> implements Interner<T>, ICleanableCache {
 
     private final Hash.Strategy<? super T> strategy;
-    private final Segment<T>[] segments;
-    private final int segmentShift;
-    private final int segmentMask;
 
     /** Creates an interner with default concurrency. */
     public WeakCustomHashInterner(Hash.Strategy<? super T> strategy) {
-        this(Runtime.getRuntime().availableProcessors(), strategy);
+        this(Concurrents.NCPU, strategy);
     }
 
     /**
@@ -34,20 +32,9 @@ public final class WeakCustomHashInterner<T> implements Interner<T>, ICleanableC
      *
      * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
      */
-    @SuppressWarnings("unchecked")
     public WeakCustomHashInterner(int concurrencyLevel, Hash.Strategy<? super T> strategy) {
+        super(concurrencyLevel, i -> new Segment<>(strategy));
         this.strategy = strategy;
-        if (concurrencyLevel <= 0) throw new IllegalArgumentException("concurrencyLevel must be positive");
-        int ssize = 1;
-        while (ssize < concurrencyLevel) {
-            ssize <<= 1;
-        }
-        this.segmentShift = 32 - Integer.numberOfTrailingZeros(ssize);
-        this.segmentMask = ssize - 1;
-        this.segments = new Segment[ssize];
-        for (int i = 0; i < ssize; i++) {
-            segments[i] = new Segment<>(strategy);
-        }
         CacheCleaner.add(this);
     }
 
@@ -55,82 +42,82 @@ public final class WeakCustomHashInterner<T> implements Interner<T>, ICleanableC
     @Override
     public T intern(final T sample) {
         int hash = strategy.hashCode(sample);
-        int mix = hash * -1640531527;
-        mix ^= mix >>> 16;
-        return segments[(mix >>> segmentShift) & segmentMask].intern(sample, hash, mix);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).intern(sample, hash, mix);
     }
 
     /** {@inheritDoc} */
     @Override
     public boolean isPresent(final T sample) {
         int hash = strategy.hashCode(sample);
-        int mix = hash * -1640531527;
-        mix ^= mix >>> 16;
-        return segments[(mix >>> segmentShift) & segmentMask].contains(sample, hash, mix);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).contains(sample, hash, mix);
     }
 
     /** {@inheritDoc} */
     @Override
     public boolean addIfAbsent(final T sample) {
         int hash = strategy.hashCode(sample);
-        int mix = hash * -1640531527;
-        mix ^= mix >>> 16;
-        return segments[(mix >>> segmentShift) & segmentMask].add(sample, hash, mix);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).add(sample, hash, mix);
     }
 
     /** {@inheritDoc} */
     @Override
     public void clear() {
-        for (var seg : segments) {
-            seg.clear();
-        }
+        clearSegments();
     }
 
     /** {@inheritDoc} Drops every entry whose instance has been collected. */
     @Override
     public void clearCache() {
-        for (var seg : segments) {
-            seg.clearInvalid();
-        }
+        sweepSegments();
     }
 
     /**
      * A striped segment holding canonical instances as {@link WeakReferenceNode}s
-     * (weak referent, stored hash, strategy-compared). Dead nodes are removed in
-     * passing by writers and swept in bulk by {@link #clearInvalid()}; readers
-     * never mutate the chain.
+     * (weak referent, stored hash, strategy-compared) on the shared
+     * {@link HashSegment} skeleton. Dead nodes are removed in passing by
+     * writers and dropped in bulk by the inherited sweep; readers never mutate
+     * the chain.
      */
-    private final static class Segment<T> extends StampedLock {
+    final static class Segment<T> extends HashSegment<WeakReferenceNode<T>> {
         private final Hash.Strategy<? super T> strategy;
-        private volatile WeakReferenceNode<T>[] table;
-        private volatile int mask;
-        private volatile int size;
-        private volatile int maxFill;
 
-        @SuppressWarnings("unchecked")
         private Segment(Hash.Strategy<? super T> strategy) {
             this.strategy = strategy;
-            int n = arraySize(Hash.DEFAULT_INITIAL_SIZE, Hash.DEFAULT_LOAD_FACTOR);
-            this.table = new WeakReferenceNode[n];
-            this.mask = n - 1;
-            this.maxFill = (int) (n * Hash.DEFAULT_LOAD_FACTOR);
         }
 
-        /** Optimistic lookup; on a miss the canonical instance is stored under the write lock. */
+        @Override
+        @SuppressWarnings("unchecked")
+        protected WeakReferenceNode<T>[] newArray(int capacity) {
+            return new WeakReferenceNode[capacity];
+        }
+
+        @Override
+        protected int nodeHash(WeakReferenceNode<T> node) {
+            return node.hash;
+        }
+
+        @Override
+        protected boolean isDead(WeakReferenceNode<T> node) {
+            return node.get() == null;
+        }
+
+        /** Lookup under the read lock; on a miss the canonical instance is stored under the write lock. */
         private T intern(final T k, final int hash, int mix) {
-            long stamp = tryOptimisticRead();
-            if (validate(stamp)) {
+            long stamp = readLock();
+            try {
                 WeakReferenceNode<T> curr = table[mix & mask];
                 while (curr != null) {
                     T key = curr.get();
                     if (key != null && curr.hash == hash && (key == k || strategy.equals(k, key))) {
-                        if (validate(stamp)) {
-                            return key;
-                        }
-                        break;
+                        return key;
                     }
                     curr = curr.next;
                 }
+            }finally {
+                unlockRead(stamp);
             }
             stamp = writeLock();
             try {
@@ -168,34 +155,15 @@ public final class WeakCustomHashInterner<T> implements Interner<T>, ICleanableC
 
         /** Read-only membership test; never mutates the chain. */
         private boolean contains(final T k, final int hash, int mix) {
-            long stamp = tryOptimisticRead();
-            if (validate(stamp)) {
-                WeakReferenceNode<T> curr = table[mix & mask];
-                while (curr != null) {
-                    T key = curr.get();
-                    if (key != null && curr.hash == hash && (key == k || strategy.equals(k, key))) {
-                        if (validate(stamp)) {
-                            return true;
-                        }
-                        break;
-                    }
-                    curr = curr.next;
-                }
-                if (validate(stamp)) {
-                    return false;
-                }
-            }
-            stamp = readLock();
+            long stamp = readLock();
             try {
                 final int index = mix & mask;
                 WeakReferenceNode<T> curr = table[index];
                 while (curr != null) {
                     T key = curr.get();
-                    if (key == null) {
-                        // collected entry: treat as absent; readers must not mutate the chain
-                        return false;
-                    }
-                    if (curr.hash == hash && (key == k || strategy.equals(k, key))) {
+                    // collected nodes are skipped: a dead node earlier in the chain
+                    // must not hide a live canonical instance behind it
+                    if (key != null && curr.hash == hash && (key == k || strategy.equals(k, key))) {
                         return true;
                     }
                     curr = curr.next;
@@ -208,21 +176,7 @@ public final class WeakCustomHashInterner<T> implements Interner<T>, ICleanableC
 
         /** Inserts only if absent, returning whether a new canonical instance was stored. */
         private boolean add(final T k, final int hash, int mix) {
-            long stamp = tryOptimisticRead();
-            if (validate(stamp)) {
-                WeakReferenceNode<T> curr = table[mix & mask];
-                while (curr != null) {
-                    T key = curr.get();
-                    if (key != null && curr.hash == hash && (key == k || strategy.equals(k, key))) {
-                        if (validate(stamp)) {
-                            return false;
-                        }
-                        break;
-                    }
-                    curr = curr.next;
-                }
-            }
-            stamp = writeLock();
+            long stamp = writeLock();
             try {
                 final int index = mix & mask;
                 WeakReferenceNode<T> node = table[index];
@@ -251,96 +205,6 @@ public final class WeakCustomHashInterner<T> implements Interner<T>, ICleanableC
                     resize();
                 }
                 return true;
-            } finally {
-                unlockWrite(stamp);
-            }
-        }
-
-
-        /** Doubles the table and rehashes every chain; called with the write lock held. */
-        @SuppressWarnings("unchecked")
-        private void resize() {
-            WeakReferenceNode<T>[] oldTab = table;
-            int oldCap = oldTab.length;
-            int newCap = oldCap << 1;
-            WeakReferenceNode<T>[] newTab = new WeakReferenceNode[newCap];
-            int newMask = newCap - 1;
-            for (int i = 0; i < oldCap; ++i) {
-                WeakReferenceNode<T> e;
-                if ((e = oldTab[i]) != null) {
-                    oldTab[i] = null;
-                    if (e.next == null) {
-                        newTab[HashCommon.mix(e.hash) & newMask] = e;
-                    } else {
-                        WeakReferenceNode<T> loHead = null, loTail = null;
-                        WeakReferenceNode<T> hiHead = null, hiTail = null;
-                        WeakReferenceNode<T> next;
-                        do {
-                            next = e.next;
-                            if ((HashCommon.mix(e.hash) & oldCap) == 0) {
-                                if (loTail == null)
-                                    loHead = e;
-                                else
-                                    loTail.next = e;
-                                loTail = e;
-                            } else {
-                                if (hiTail == null)
-                                    hiHead = e;
-                                else
-                                    hiTail.next = e;
-                                hiTail = e;
-                            }
-                        } while ((e = next) != null);
-                        if (loTail != null) {
-                            loTail.next = null;
-                            newTab[HashCommon.mix(loHead.hash) & newMask] = loHead;
-                        }
-                        if (hiTail != null) {
-                            hiTail.next = null;
-                            newTab[HashCommon.mix(hiHead.hash) & newMask] = hiHead;
-                        }
-                    }
-                }
-            }
-            table = newTab;
-            mask = newMask;
-            maxFill = (int) (newCap * Hash.DEFAULT_LOAD_FACTOR);
-        }
-
-        /** Empties the table under the write lock. */
-        private void clear() {
-            long stamp = writeLock();
-            try {
-                if (size == 0) return;
-                size = 0;
-                Arrays.fill(table, null);
-            } finally {
-                unlockWrite(stamp);
-            }
-        }
-
-        /** Sweeps every node whose referent has been collected; called under the write lock. */
-        private void clearInvalid() {
-            long stamp = writeLock();
-            try {
-                for (int i = 0; i < table.length; i++) {
-                    WeakReferenceNode<T> prev = null;
-                    WeakReferenceNode<T> curr = table[i];
-                    while (curr != null) {
-                        if (curr.get() == null) {
-                            if (prev == null) {
-                                table[i] = curr.next;
-                            } else {
-                                prev.next = curr.next;
-                            }
-                            size--;
-                            curr = curr.next;
-                        } else {
-                            prev = curr;
-                            curr = curr.next;
-                        }
-                    }
-                }
             } finally {
                 unlockWrite(stamp);
             }
