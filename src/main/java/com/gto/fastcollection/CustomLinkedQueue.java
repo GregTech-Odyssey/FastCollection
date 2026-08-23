@@ -6,6 +6,18 @@ import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.Consumer;
 
+/**
+ * An intrusive doubly-linked queue: nodes carry their own {@code prev} /
+ * {@code next} pointers (via {@link LinkNode}), so enqueue, dequeue and unlink
+ * are all constant-time pointer relinks with no per-element wrapper
+ * allocations. The queue itself never touches node contents beyond the link
+ * pointers.
+ *
+ * <p>Not thread-safe; confined to one thread. A node must not be linked into
+ * more than one queue at a time.
+ *
+ * @param <T> the node type, which links itself
+ */
 public class CustomLinkedQueue<T extends CustomLinkedQueue.LinkNode<T>> implements Iterable<T> {
 
     protected T first;
@@ -200,6 +212,12 @@ public class CustomLinkedQueue<T extends CustomLinkedQueue.LinkNode<T>> implemen
         }
     }
 
+    /**
+     * A node that can be linked into a {@link CustomLinkedQueue}: it stores its
+     * own predecessor and successor pointers.
+     *
+     * @param <T> the concrete node type, so relinking stays type-safe
+     */
     public interface LinkNode<T extends LinkNode<T>> {
 
         T getPrev();
@@ -211,6 +229,10 @@ public class CustomLinkedQueue<T extends CustomLinkedQueue.LinkNode<T>> implemen
         void setNext(T next);
     }
 
+    /**
+     * A base implementation of {@link LinkNode} holding the two pointers, so
+     * concrete nodes only add their payload fields.
+     */
     public abstract static class AbstractLinkNode<T extends AbstractLinkNode<T>> implements LinkNode<T> {
 
         protected T prev;

@@ -8,6 +8,14 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.function.Consumer;
 
+/**
+ * A cached-hash open-addressing set. Each slot stores the key's hash in a
+ * parallel {@code int[]} array, so probes short-circuit on the stored hash and
+ * reference identity ({@code ==}) before falling back to {@code equals};
+ * {@code rehash} reuses the stored hashes instead of recomputing them.
+ *
+ * <p>Not thread-safe; confined to one thread.
+ */
 public final class OpenCacheHashSet<K> extends ObjectOpenHashSet<K> {
 
     private int[] hash;

@@ -14,6 +14,18 @@ import java.util.function.Function;
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 import static it.unimi.dsi.fastutil.HashCommon.maxFill;
 
+/**
+ * A cached-hash open-addressing map from object keys to object values with a
+ * custom {@link it.unimi.dsi.fastutil.Hash.Strategy}, the strategy-based counterpart of
+ * {@link O2OOpenCacheHashMap}. Each slot stores the key's strategy hash in a
+ * parallel {@code int[]} array, so probes short-circuit on the stored hash and
+ * reference identity ({@code ==}) before falling back to
+ * {@code strategy.equals}; {@code rehash} reuses the stored hashes instead of
+ * recomputing them. Use it when "equal" must be decided by application logic
+ * rather than {@code equals}.
+ *
+ * <p>Not thread-safe; confined to one thread.
+ */
 public final class O2OOpenCustomCacheHashMap<K, V> extends Object2ObjectOpenCustomHashMap<K, V> {
 
     private int[] hash;

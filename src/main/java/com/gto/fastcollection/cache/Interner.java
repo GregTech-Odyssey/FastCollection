@@ -10,10 +10,20 @@ import java.util.function.UnaryOperator;
  */
 public interface Interner<T> {
 
-    UnaryOperator IDENTITY_OPERATOR = UnaryOperator.identity();
+    /**
+     * The shared identity mapping (no remapping), reused by every caller.
+     */
+    UnaryOperator<Object> IDENTITY_OPERATOR = UnaryOperator.identity();
 
+    /**
+     * The default mapping: the identity function, so the sample is interned as-is.
+     *
+     * @param <T> the sample type
+     * @return the shared identity mapping
+     */
+    @SuppressWarnings("unchecked")
     static <T> UnaryOperator<T> identityMappingFunction() {
-        return IDENTITY_OPERATOR;
+        return (UnaryOperator<T>) IDENTITY_OPERATOR;
     }
 
     /**
@@ -22,6 +32,12 @@ public interface Interner<T> {
      */
     T intern(final T sample);
 
+    /**
+     * Like {@link #intern(Object)}, but inserts {@code mappingFunction.apply(sample)}
+     * as the canonical instance when none equal is interned yet, instead of
+     * {@code sample} itself. Useful for storing a derived (e.g. interned-by-content)
+     * form as the canonical instance.
+     */
     T intern(final T sample, UnaryOperator<T> mappingFunction);
 
     /**

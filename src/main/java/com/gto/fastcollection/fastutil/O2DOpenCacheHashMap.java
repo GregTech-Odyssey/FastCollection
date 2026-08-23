@@ -12,6 +12,15 @@ import java.util.function.Consumer;
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 import static it.unimi.dsi.fastutil.HashCommon.maxFill;
 
+/**
+ * A cached-hash open-addressing map from object keys to primitive
+ * {@code double} values. Each slot stores the key's hash in a parallel
+ * {@code int[]} array, so probes short-circuit on the stored hash and reference
+ * identity ({@code ==}) before falling back to {@code equals}; {@code rehash}
+ * reuses the stored hashes instead of recomputing them.
+ *
+ * <p>Not thread-safe; confined to one thread.
+ */
 public final class O2DOpenCacheHashMap<K> extends Object2DoubleOpenHashMap<K> {
 
     private int[] hash;

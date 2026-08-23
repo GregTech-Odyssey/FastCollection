@@ -6,7 +6,7 @@ plugins {
 }
 
 group = 'com.gto.fastcollection'
-version = '26.8.3'
+version = '26.8.4'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 

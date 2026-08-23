@@ -13,6 +13,18 @@ import java.util.function.ToIntFunction;
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 import static it.unimi.dsi.fastutil.HashCommon.maxFill;
 
+/**
+ * A cached-hash open-addressing map from object keys to primitive
+ * {@code byte} values with a custom {@link it.unimi.dsi.fastutil.Hash.Strategy}, the strategy-based
+ * counterpart of {@link O2BOpenCacheHashMap}. Each slot stores the key's
+ * strategy hash in a parallel {@code int[]} array, so probes short-circuit on
+ * the stored hash and reference identity ({@code ==}) before falling back to
+ * {@code strategy.equals}; {@code rehash} reuses the stored hashes instead of
+ * recomputing them. Use it when "equal" must be decided by application logic
+ * rather than {@code equals}.
+ *
+ * <p>Not thread-safe; confined to one thread.
+ */
 public final class O2BOpenCustomCacheHashMap<K> extends Object2ByteOpenCustomHashMap<K> {
 
     private int[] hash;
