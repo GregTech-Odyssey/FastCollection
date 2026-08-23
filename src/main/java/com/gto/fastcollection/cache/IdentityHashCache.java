@@ -24,23 +24,47 @@ import static it.unimi.dsi.fastutil.HashCommon.arraySize;
  */
 public final class IdentityHashCache<K, V> extends Segmented<IdentityHashCache.Segment<K, V>> implements MapCache<K, V> {
 
+    private final Function<? super K, ? extends V> createFunction;
 
     /**
-     * Creates a cache with default concurrency and the given factory;
-     * {@code null} is allowed and behaves like the no-factory constructor.
+     * Creates a cache with default concurrency and no default create function.
      */
     public IdentityHashCache() {
-        this(Concurrents.NCPU);
+        this(Concurrents.NCPU, null);
     }
 
+    /**
+     * Creates a cache with default concurrency and the given default create
+     * function; {@code null} is allowed and behaves like the no-factory
+     * constructor.
+     */
+    public IdentityHashCache(Function<? super K, ? extends V> createFunction) {
+        this(Concurrents.NCPU, createFunction);
+    }
 
     /**
-     * Creates a cache with the given concurrency level and factory.
+     * Creates a cache with the given concurrency level and no default create
+     * function.
      *
      * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
      */
     public IdentityHashCache(int concurrencyLevel) {
+        this(concurrencyLevel, null);
+    }
+
+    /**
+     * Creates a cache with the given concurrency level and default create function.
+     *
+     * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
+     */
+    public IdentityHashCache(int concurrencyLevel, Function<? super K, ? extends V> createFunction) {
         super(concurrencyLevel, i -> new Segment<>());
+        this.createFunction = createFunction;
+    }
+
+    @Override
+    public Function<? super K, ? extends V> createFunction() {
+        return createFunction;
     }
 
 

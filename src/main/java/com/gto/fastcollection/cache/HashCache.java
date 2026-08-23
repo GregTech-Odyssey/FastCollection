@@ -24,14 +24,29 @@ import java.util.function.UnaryOperator;
 public final class HashCache<K, V> implements MapCache<K, V> {
 
     private final ConcurrentHashMap<K, V> map;
+    private final Function<? super K, ? extends V> createFunction;
 
     /**
-     * Creates a cache using {@code createFunction} for the no-argument
-     * {@link #getCache(Object)} / {@link #getCacheRecursive(Object)} methods;
-     * {@code null} is allowed and behaves like the no-factory constructor.
+     * Creates a cache with no default create function.
      */
     public HashCache() {
+        this(null);
+    }
+
+    /**
+     * Creates a cache using {@code createFunction} as the default for the
+     * no-function {@link #getCache(Object)} / {@link #getCacheRecursive(Object)}
+     * methods; {@code null} is allowed and behaves like the no-factory
+     * constructor.
+     */
+    public HashCache(Function<? super K, ? extends V> createFunction) {
         this.map = new ConcurrentHashMap<>();
+        this.createFunction = createFunction;
+    }
+
+    @Override
+    public Function<? super K, ? extends V> createFunction() {
+        return createFunction;
     }
 
     /**

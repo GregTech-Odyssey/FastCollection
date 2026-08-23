@@ -86,6 +86,43 @@ public interface MapCache<K, V> {
     V getCacheRecursive(final K k, Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction);
 
     /**
+     * The default create function wired into this cache at construction, used by
+     * the no-function {@code getCache} overloads. May be {@code null} when no
+     * factory was configured; calling those overloads on such a cache then throws
+     * {@link NullPointerException}.
+     */
+    default Function<? super K, ? extends V> createFunction() {
+        return null;
+    }
+
+    /**
+     * Returns the value associated with {@code k}, computing and storing it with
+     * the default {@link #createFunction()} if absent. Recursive calls from the
+     * function back into this cache are safe.
+     *
+     * @param k the key to look up
+     * @return the value now associated with {@code k}
+     * @throws NullPointerException if no default create function was configured
+     */
+    default V getCache(final K k) {
+        return getCache(k, createFunction());
+    }
+
+    /**
+     * Returns the value associated with {@code k}, computing and storing it with
+     * the default {@link #createFunction()} if absent. The function runs without
+     * holding any lock, so recursive calls back into this cache are guaranteed
+     * safe.
+     *
+     * @param k the key to look up
+     * @return the value now associated with {@code k}
+     * @throws NullPointerException if no default create function was configured
+     */
+    default V getCacheRecursive(final K k) {
+        return getCacheRecursive(k, createFunction());
+    }
+
+    /**
      * Returns the value associated with {@code k}, or {@code null} if absent.
      * Never stores anything.
      */

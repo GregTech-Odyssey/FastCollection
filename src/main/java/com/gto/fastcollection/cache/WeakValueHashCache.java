@@ -25,21 +25,40 @@ import java.util.function.UnaryOperator;
  */
 public final class WeakValueHashCache<K, V> extends Segmented<WeakValueHashCache.Segment<K, V>> implements MapCache<K, V>, ICleanableCache {
 
+    private final Function<? super K, ? extends V> createFunction;
 
     public WeakValueHashCache() {
-        this(Concurrents.NCPU);
+        this(Concurrents.NCPU, null);
     }
 
+    /**
+     * Creates a cache with default concurrency and the given default create
+     * function; {@code null} is allowed and behaves like the no-factory
+     * constructor.
+     */
+    public WeakValueHashCache(Function<? super K, ? extends V> createFunction) {
+        this(Concurrents.NCPU, createFunction);
+    }
+
+    public WeakValueHashCache(int concurrencyLevel) {
+        this(concurrencyLevel, null);
+    }
 
     /**
-     * Creates a cache with the given concurrency level and factory; registers
-     * this cache with {@link CacheCleaner}.
+     * Creates a cache with the given concurrency level and default create function;
+     * registers this cache with {@link CacheCleaner}.
      *
      * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
      */
-    public WeakValueHashCache(int concurrencyLevel) {
+    public WeakValueHashCache(int concurrencyLevel, Function<? super K, ? extends V> createFunction) {
         super(concurrencyLevel, i -> new Segment<>());
+        this.createFunction = createFunction;
         CacheCleaner.add(this);
+    }
+
+    @Override
+    public Function<? super K, ? extends V> createFunction() {
+        return createFunction;
     }
 
     @Override

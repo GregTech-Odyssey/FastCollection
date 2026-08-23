@@ -26,25 +26,51 @@ import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 public final class CustomHashCache<K, V> extends Segmented<CustomHashCache.Segment<K, V>> implements MapCache<K, V> {
 
     private final Hash.Strategy<? super K> strategy;
+    private final Function<? super K, ? extends V> createFunction;
 
     /**
-     * Creates a cache with default concurrency and the given factory;
-     * {@code null} is allowed and behaves like the no-factory constructor.
+     * Creates a cache with default concurrency and no default create function.
      */
     public CustomHashCache(Hash.Strategy<? super K> strategy) {
-        this(strategy, Concurrents.NCPU);
+        this(strategy, Concurrents.NCPU, null);
     }
 
     /**
-     * Creates a cache with the given concurrency level and factory.
+     * Creates a cache with default concurrency and the given default create
+     * function; {@code null} is allowed and behaves like the no-factory
+     * constructor.
+     */
+    public CustomHashCache(Hash.Strategy<? super K> strategy, Function<? super K, ? extends V> createFunction) {
+        this(strategy, Concurrents.NCPU, createFunction);
+    }
+
+    /**
+     * Creates a cache with the given concurrency level and no default create function.
      *
      * @param concurrencyLevel upper bound on the number of threads concurrently
      *                         updating distinct segments; rounded up to a power of two
      * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
      */
     public CustomHashCache(Hash.Strategy<? super K> strategy, int concurrencyLevel) {
+        this(strategy, concurrencyLevel, null);
+    }
+
+    /**
+     * Creates a cache with the given concurrency level and default create function.
+     *
+     * @param concurrencyLevel upper bound on the number of threads concurrently
+     *                         updating distinct segments; rounded up to a power of two
+     * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
+     */
+    public CustomHashCache(Hash.Strategy<? super K> strategy, int concurrencyLevel, Function<? super K, ? extends V> createFunction) {
         super(concurrencyLevel, i -> new Segment<>(strategy));
         this.strategy = strategy;
+        this.createFunction = createFunction;
+    }
+
+    @Override
+    public Function<? super K, ? extends V> createFunction() {
+        return createFunction;
     }
 
     @Override

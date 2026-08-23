@@ -23,25 +23,48 @@ import static it.unimi.dsi.fastutil.HashCommon.arraySize;
  */
 public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueIdentityHashCache.Segment<K, V>> implements MapCache<K, V>, ICleanableCache {
 
+    private final Function<? super K, ? extends V> createFunction;
 
     /**
-     * Creates a cache with default concurrency and the given factory;
-     * {@code null} is allowed and behaves like the no-factory constructor.
+     * Creates a cache with default concurrency and no default create function.
      */
     public WeakValueIdentityHashCache() {
-        this(Concurrents.NCPU);
+        this(Concurrents.NCPU, null);
     }
 
+    /**
+     * Creates a cache with default concurrency and the given default create
+     * function; {@code null} is allowed and behaves like the no-factory
+     * constructor.
+     */
+    public WeakValueIdentityHashCache(Function<? super K, ? extends V> createFunction) {
+        this(Concurrents.NCPU, createFunction);
+    }
 
     /**
-     * Creates a cache with the given concurrency level and factory; registers
-     * this cache with {@link CacheCleaner}.
+     * Creates a cache with the given concurrency level and no default create function.
      *
      * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
      */
     public WeakValueIdentityHashCache(int concurrencyLevel) {
+        this(concurrencyLevel, null);
+    }
+
+    /**
+     * Creates a cache with the given concurrency level and default create function;
+     * registers this cache with {@link CacheCleaner}.
+     *
+     * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
+     */
+    public WeakValueIdentityHashCache(int concurrencyLevel, Function<? super K, ? extends V> createFunction) {
         super(concurrencyLevel, i -> new Segment<>());
+        this.createFunction = createFunction;
         CacheCleaner.add(this);
+    }
+
+    @Override
+    public Function<? super K, ? extends V> createFunction() {
+        return createFunction;
     }
 
     @Override
