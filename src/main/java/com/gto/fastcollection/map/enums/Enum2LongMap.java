@@ -1,14 +1,7 @@
 package com.gto.fastcollection.map.enums;
 
 import com.gto.fastcollection.util.EnumKeys;
-import it.unimi.dsi.fastutil.objects.AbstractObjectSet;
-import it.unimi.dsi.fastutil.objects.AbstractReference2LongMap;
-import it.unimi.dsi.fastutil.objects.AbstractReferenceSet;
-import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
-import it.unimi.dsi.fastutil.objects.Reference2LongFunction;
-import it.unimi.dsi.fastutil.objects.Reference2LongMap;
-import it.unimi.dsi.fastutil.objects.ReferenceSet;
+import it.unimi.dsi.fastutil.objects.*;
 import it.unimi.dsi.fastutil.longs.LongCollection;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.AbstractLongCollection;
@@ -66,8 +59,9 @@ public final class Enum2LongMap<K extends Enum<K>> extends AbstractReference2Lon
      * Creates a copy of {@code map}.
      */
     public Enum2LongMap(Enum2LongMap<K> map) {
-        this(map.keyType);
-        System.arraycopy(map.vals, 0, vals, 0, vals.length);
+        this.keyType = map.keyType;
+        this.keys = map.keys;
+        this.vals = map.vals.clone();
         this.size = map.size;
     }
 
@@ -160,7 +154,7 @@ public final class Enum2LongMap<K extends Enum<K>> extends AbstractReference2Lon
     }
 
     @Override
-    public ObjectSet<Reference2LongMap.Entry<K>> reference2LongEntrySet() {
+    public FastEntrySet<K> reference2LongEntrySet() {
         return entrySet;
     }
 

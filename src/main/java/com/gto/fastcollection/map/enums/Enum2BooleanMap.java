@@ -66,8 +66,9 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
      * Creates a copy of {@code map}.
      */
     public Enum2BooleanMap(Enum2BooleanMap<K> map) {
-        this(map.keyType);
-        System.arraycopy(map.vals, 0, vals, 0, vals.length);
+        this.keyType = map.keyType;
+        this.keys = map.keys;
+        this.vals = map.vals.clone();
         this.size = map.size;
     }
 
@@ -160,7 +161,7 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
     }
 
     @Override
-    public ObjectSet<Reference2BooleanMap.Entry<K>> reference2BooleanEntrySet() {
+    public FastEntrySet<K> reference2BooleanEntrySet() {
         return entrySet;
     }
 

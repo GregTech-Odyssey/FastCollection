@@ -67,8 +67,9 @@ public final class Enum2ByteMap<K extends Enum<K>> extends AbstractReference2Byt
      * Creates a copy of {@code map}.
      */
     public Enum2ByteMap(Enum2ByteMap<K> map) {
-        this(map.keyType);
-        System.arraycopy(map.vals, 0, vals, 0, vals.length);
+        this.keyType = map.keyType;
+        this.keys = map.keys;
+        this.vals = map.vals.clone();
         this.size = map.size;
     }
 
@@ -161,7 +162,7 @@ public final class Enum2ByteMap<K extends Enum<K>> extends AbstractReference2Byt
     }
 
     @Override
-    public ObjectSet<Reference2ByteMap.Entry<K>> reference2ByteEntrySet() {
+    public FastEntrySet<K> reference2ByteEntrySet() {
         return entrySet;
     }
 

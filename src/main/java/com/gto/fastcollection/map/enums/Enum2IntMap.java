@@ -1,14 +1,7 @@
 package com.gto.fastcollection.map.enums;
 
 import com.gto.fastcollection.util.EnumKeys;
-import it.unimi.dsi.fastutil.objects.AbstractObjectSet;
-import it.unimi.dsi.fastutil.objects.AbstractReference2IntMap;
-import it.unimi.dsi.fastutil.objects.AbstractReferenceSet;
-import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
-import it.unimi.dsi.fastutil.objects.Reference2IntFunction;
-import it.unimi.dsi.fastutil.objects.Reference2IntMap;
-import it.unimi.dsi.fastutil.objects.ReferenceSet;
+import it.unimi.dsi.fastutil.objects.*;
 import it.unimi.dsi.fastutil.ints.IntCollection;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.AbstractIntCollection;
@@ -66,8 +59,9 @@ public final class Enum2IntMap<K extends Enum<K>> extends AbstractReference2IntM
      * Creates a copy of {@code map}.
      */
     public Enum2IntMap(Enum2IntMap<K> map) {
-        this(map.keyType);
-        System.arraycopy(map.vals, 0, vals, 0, vals.length);
+        this.keyType = map.keyType;
+        this.keys = map.keys;
+        this.vals = map.vals.clone();
         this.size = map.size;
     }
 
@@ -160,7 +154,7 @@ public final class Enum2IntMap<K extends Enum<K>> extends AbstractReference2IntM
     }
 
     @Override
-    public ObjectSet<Reference2IntMap.Entry<K>> reference2IntEntrySet() {
+    public FastEntrySet<K> reference2IntEntrySet() {
         return entrySet;
     }
 

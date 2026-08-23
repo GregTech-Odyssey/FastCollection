@@ -1,14 +1,7 @@
 package com.gto.fastcollection.map.enums;
 
 import com.gto.fastcollection.util.EnumKeys;
-import it.unimi.dsi.fastutil.objects.AbstractObjectSet;
-import it.unimi.dsi.fastutil.objects.AbstractReference2FloatMap;
-import it.unimi.dsi.fastutil.objects.AbstractReferenceSet;
-import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
-import it.unimi.dsi.fastutil.objects.Reference2FloatFunction;
-import it.unimi.dsi.fastutil.objects.Reference2FloatMap;
-import it.unimi.dsi.fastutil.objects.ReferenceSet;
+import it.unimi.dsi.fastutil.objects.*;
 import it.unimi.dsi.fastutil.floats.FloatBinaryOperator;
 import it.unimi.dsi.fastutil.floats.FloatCollection;
 import it.unimi.dsi.fastutil.floats.FloatIterator;
@@ -67,8 +60,9 @@ public final class Enum2FloatMap<K extends Enum<K>> extends AbstractReference2Fl
      * Creates a copy of {@code map}.
      */
     public Enum2FloatMap(Enum2FloatMap<K> map) {
-        this(map.keyType);
-        System.arraycopy(map.vals, 0, vals, 0, vals.length);
+        this.keyType = map.keyType;
+        this.keys = map.keys;
+        this.vals = map.vals.clone();
         this.size = map.size;
     }
 
@@ -161,7 +155,7 @@ public final class Enum2FloatMap<K extends Enum<K>> extends AbstractReference2Fl
     }
 
     @Override
-    public ObjectSet<Reference2FloatMap.Entry<K>> reference2FloatEntrySet() {
+    public FastEntrySet<K> reference2FloatEntrySet() {
         return entrySet;
     }
 

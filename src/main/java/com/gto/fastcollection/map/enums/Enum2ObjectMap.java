@@ -1,15 +1,7 @@
 package com.gto.fastcollection.map.enums;
 
 import com.gto.fastcollection.util.EnumKeys;
-import it.unimi.dsi.fastutil.objects.AbstractObjectSet;
-import it.unimi.dsi.fastutil.objects.AbstractReference2ReferenceMap;
-import it.unimi.dsi.fastutil.objects.AbstractReferenceCollection;
-import it.unimi.dsi.fastutil.objects.AbstractReferenceSet;
-import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
-import it.unimi.dsi.fastutil.objects.Reference2ReferenceMap;
-import it.unimi.dsi.fastutil.objects.ReferenceCollection;
-import it.unimi.dsi.fastutil.objects.ReferenceSet;
+import it.unimi.dsi.fastutil.objects.*;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -67,9 +59,10 @@ public final class Enum2ObjectMap<K extends Enum<K>, V> extends AbstractReferenc
     /**
      * Creates a copy of {@code map}.
      */
-    public Enum2ObjectMap(Enum2ObjectMap<K, V> map) {
-        this(map.keyType);
-        System.arraycopy(map.vals, 0, vals, 0, vals.length);
+    public Enum2ObjectMap(Enum2ObjectMap<K,V> map) {
+        this.keyType = map.keyType;
+        this.keys = map.keys;
+        this.vals = map.vals.clone();
         this.size = map.size;
     }
 
@@ -153,7 +146,7 @@ public final class Enum2ObjectMap<K extends Enum<K>, V> extends AbstractReferenc
     }
 
     @Override
-    public ObjectSet<Reference2ReferenceMap.Entry<K, V>> reference2ReferenceEntrySet() {
+    public FastEntrySet<K,V> reference2ReferenceEntrySet() {
         return entrySet;
     }
 

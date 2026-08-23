@@ -1,14 +1,7 @@
 package com.gto.fastcollection.map.enums;
 
 import com.gto.fastcollection.util.EnumKeys;
-import it.unimi.dsi.fastutil.objects.AbstractObjectSet;
-import it.unimi.dsi.fastutil.objects.AbstractReference2ShortMap;
-import it.unimi.dsi.fastutil.objects.AbstractReferenceSet;
-import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
-import it.unimi.dsi.fastutil.objects.Reference2ShortFunction;
-import it.unimi.dsi.fastutil.objects.Reference2ShortMap;
-import it.unimi.dsi.fastutil.objects.ReferenceSet;
+import it.unimi.dsi.fastutil.objects.*;
 import it.unimi.dsi.fastutil.shorts.ShortBinaryOperator;
 import it.unimi.dsi.fastutil.shorts.ShortCollection;
 import it.unimi.dsi.fastutil.shorts.ShortIterator;
@@ -67,8 +60,9 @@ public final class Enum2ShortMap<K extends Enum<K>> extends AbstractReference2Sh
      * Creates a copy of {@code map}.
      */
     public Enum2ShortMap(Enum2ShortMap<K> map) {
-        this(map.keyType);
-        System.arraycopy(map.vals, 0, vals, 0, vals.length);
+        this.keyType = map.keyType;
+        this.keys = map.keys;
+        this.vals = map.vals.clone();
         this.size = map.size;
     }
 
@@ -161,7 +155,7 @@ public final class Enum2ShortMap<K extends Enum<K>> extends AbstractReference2Sh
     }
 
     @Override
-    public ObjectSet<Reference2ShortMap.Entry<K>> reference2ShortEntrySet() {
+    public FastEntrySet<K> reference2ShortEntrySet() {
         return entrySet;
     }
 

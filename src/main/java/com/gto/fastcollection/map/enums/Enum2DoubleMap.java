@@ -1,14 +1,7 @@
 package com.gto.fastcollection.map.enums;
 
 import com.gto.fastcollection.util.EnumKeys;
-import it.unimi.dsi.fastutil.objects.AbstractObjectSet;
-import it.unimi.dsi.fastutil.objects.AbstractReference2DoubleMap;
-import it.unimi.dsi.fastutil.objects.AbstractReferenceSet;
-import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
-import it.unimi.dsi.fastutil.objects.Reference2DoubleFunction;
-import it.unimi.dsi.fastutil.objects.Reference2DoubleMap;
-import it.unimi.dsi.fastutil.objects.ReferenceSet;
+import it.unimi.dsi.fastutil.objects.*;
 import it.unimi.dsi.fastutil.doubles.DoubleCollection;
 import it.unimi.dsi.fastutil.doubles.DoubleIterator;
 import it.unimi.dsi.fastutil.doubles.AbstractDoubleCollection;
@@ -66,8 +59,9 @@ public final class Enum2DoubleMap<K extends Enum<K>> extends AbstractReference2D
      * Creates a copy of {@code map}.
      */
     public Enum2DoubleMap(Enum2DoubleMap<K> map) {
-        this(map.keyType);
-        System.arraycopy(map.vals, 0, vals, 0, vals.length);
+        this.keyType = map.keyType;
+        this.keys = map.keys;
+        this.vals = map.vals.clone();
         this.size = map.size;
     }
 
@@ -160,7 +154,7 @@ public final class Enum2DoubleMap<K extends Enum<K>> extends AbstractReference2D
     }
 
     @Override
-    public ObjectSet<Reference2DoubleMap.Entry<K>> reference2DoubleEntrySet() {
+    public FastEntrySet<K> reference2DoubleEntrySet() {
         return entrySet;
     }
 

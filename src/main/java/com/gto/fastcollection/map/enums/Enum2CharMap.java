@@ -1,14 +1,7 @@
 package com.gto.fastcollection.map.enums;
 
 import com.gto.fastcollection.util.EnumKeys;
-import it.unimi.dsi.fastutil.objects.AbstractObjectSet;
-import it.unimi.dsi.fastutil.objects.AbstractReference2CharMap;
-import it.unimi.dsi.fastutil.objects.AbstractReferenceSet;
-import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
-import it.unimi.dsi.fastutil.objects.Reference2CharFunction;
-import it.unimi.dsi.fastutil.objects.Reference2CharMap;
-import it.unimi.dsi.fastutil.objects.ReferenceSet;
+import it.unimi.dsi.fastutil.objects.*;
 import it.unimi.dsi.fastutil.chars.CharBinaryOperator;
 import it.unimi.dsi.fastutil.chars.CharCollection;
 import it.unimi.dsi.fastutil.chars.CharIterator;
@@ -67,8 +60,9 @@ public final class Enum2CharMap<K extends Enum<K>> extends AbstractReference2Cha
      * Creates a copy of {@code map}.
      */
     public Enum2CharMap(Enum2CharMap<K> map) {
-        this(map.keyType);
-        System.arraycopy(map.vals, 0, vals, 0, vals.length);
+        this.keyType = map.keyType;
+        this.keys = map.keys;
+        this.vals = map.vals.clone();
         this.size = map.size;
     }
 
@@ -161,7 +155,7 @@ public final class Enum2CharMap<K extends Enum<K>> extends AbstractReference2Cha
     }
 
     @Override
-    public ObjectSet<Reference2CharMap.Entry<K>> reference2CharEntrySet() {
+    public FastEntrySet<K> reference2CharEntrySet() {
         return entrySet;
     }
 
