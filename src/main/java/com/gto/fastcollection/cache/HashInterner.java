@@ -2,6 +2,7 @@ package com.gto.fastcollection.cache;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 /**
  * An {@link Interner} backed by a single {@link ConcurrentHashMap}, using the
@@ -14,30 +15,51 @@ public final class HashInterner<T> implements Interner<T> {
     private final ConcurrentHashMap<T, T> map;
     private final Function<T, T> function = Function.identity();
 
-    /** Creates an empty interner. */
+    /**
+     * Creates an empty interner.
+     */
     public HashInterner() {
         this.map = new ConcurrentHashMap<>();
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public T intern(final T sample) {
         return map.computeIfAbsent(sample, function);
     }
 
-    /** {@inheritDoc} */
+    @Override
+    public T intern(T sample, UnaryOperator<T> mappingFunction) {
+        var v = map.get(sample);
+        if (v != null) {
+            return v;
+        }
+        v = mappingFunction.apply(sample);
+        var prev = map.putIfAbsent(v, v);
+        return prev == null ? v : prev;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean isPresent(final T sample) {
         return map.containsKey(sample);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean addIfAbsent(final T sample) {
         return map.putIfAbsent(sample, sample) == null;
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void clear() {
         map.clear();

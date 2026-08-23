@@ -6,7 +6,7 @@ public final class LoopIterator<T> implements Iterable<T>, Iterator<T> {
 
     public static final LoopIterator EMPTY = new LoopIterator(new Object[0]);
 
-    public static <T>  LoopIterator<T> empty() {
+    public static <T> LoopIterator<T> empty() {
         return EMPTY;
     }
 

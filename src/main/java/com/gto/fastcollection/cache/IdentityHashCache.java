@@ -7,6 +7,7 @@ import it.unimi.dsi.fastutil.HashCommon;
 import java.util.Arrays;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 
@@ -23,73 +24,57 @@ import static it.unimi.dsi.fastutil.HashCommon.arraySize;
  */
 public final class IdentityHashCache<K, V> extends Segmented<IdentityHashCache.Segment<K, V>> implements MapCache<K, V> {
 
-    private final Function<? super K, ? extends V> createFunction;
-
-    /** Creates a cache with default concurrency and no factory. */
-    public IdentityHashCache() {
-        this(Concurrents.NCPU, null);
-    }
 
     /**
      * Creates a cache with default concurrency and the given factory;
      * {@code null} is allowed and behaves like the no-factory constructor.
      */
-    public IdentityHashCache(Function<? super K, ? extends V> createFunction) {
-        this(Concurrents.NCPU, createFunction);
+    public IdentityHashCache() {
+        this(Concurrents.NCPU);
     }
 
-    /** Creates a cache with the given concurrency level and no factory. */
-    public IdentityHashCache(int concurrencyLevel) {
-        this(concurrencyLevel, null);
-    }
 
     /**
      * Creates a cache with the given concurrency level and factory.
      *
      * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
      */
-    public IdentityHashCache(int concurrencyLevel, Function<? super K, ? extends V> createFunction) {
+    public IdentityHashCache(int concurrencyLevel) {
         super(concurrencyLevel, i -> new Segment<>());
-        this.createFunction = createFunction;
     }
 
-    /** {@inheritDoc} The function runs under the segment's write lock; it must not recurse. */
+
     @Override
     public V getCache(final K k, Function<? super K, ? extends V> createFunction) {
         int hash = System.identityHashCode(k);
         int mix = HashCommon.mix(hash);
-        return segmentFor(mix).getCache(k, mix, createFunction);
+        return segmentFor(mix).getCache(k, mix, createFunction, Interner.identityMappingFunction());
     }
 
-    /** {@inheritDoc} */
     @Override
-    public Function<? super K, ? extends V> createFunction() {
-        return this.createFunction;
-    }
-
-    /** {@inheritDoc} Uses the constructor factory. */
-    @Override
-    public V getCache(final K k) {
+    public V getCache(K k, Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction) {
         int hash = System.identityHashCode(k);
         int mix = HashCommon.mix(hash);
-        return segmentFor(mix).getCache(k, mix, createFunction);
+        return segmentFor(mix).getCache(k, mix, createFunction, keyMappingFunction);
     }
 
-    /** {@inheritDoc} Runs the function outside all locks, so it may recurse. */
     @Override
     public V getCacheRecursive(final K k, Function<? super K, ? extends V> createFunction) {
         int hash = System.identityHashCode(k);
         int mix = HashCommon.mix(hash);
-        return segmentFor(mix).getCacheRecursive(k, mix, createFunction);
+        return segmentFor(mix).getCache(k, mix, createFunction, Interner.identityMappingFunction());
     }
 
-    /** {@inheritDoc} Uses the constructor factory. */
     @Override
-    public V getCacheRecursive(final K k) {
-        return getCacheRecursive(k, this.createFunction);
+    public V getCacheRecursive(final K k, Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction) {
+        int hash = System.identityHashCode(k);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).getCache(k, mix, createFunction, keyMappingFunction);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public V getIfPresent(final K k) {
         int hash = System.identityHashCode(k);
@@ -97,7 +82,9 @@ public final class IdentityHashCache<K, V> extends Segmented<IdentityHashCache.S
         return segmentFor(mix).getIfAbsent(k, mix);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public V putIfAbsent(final K k, final V v) {
         int hash = System.identityHashCode(k);
@@ -105,7 +92,9 @@ public final class IdentityHashCache<K, V> extends Segmented<IdentityHashCache.S
         return segmentFor(mix).put(k, v, mix);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void clear() {
         clearSegments();
@@ -138,52 +127,12 @@ public final class IdentityHashCache<K, V> extends Segmented<IdentityHashCache.S
         }
 
         /**
-         * Locked variant: probes under the read lock, then computes the value
-         * with the function while holding the write lock, so the function runs
-         * exactly once per key; it must not call back into this cache.
-         */
-        private V getCache(final K k, final int mix, Function<? super K, ? extends V> createFunction) {
-            long stamp = readLock();
-            try {
-                Node<K, V> curr = table[mix & mask];
-                while (curr != null) {
-                    if (curr.key == k) {
-                        return curr.value;
-                    }
-                    curr = curr.next;
-                }
-            } finally {
-                unlockRead(stamp);
-            }
-            stamp = writeLock();
-            try {
-                final int index = mix & mask;
-                final Node<K, V> node = table[index];
-                Node<K, V> curr = node;
-                while (curr != null) {
-                    if (curr.key == k) {
-                        return curr.value;
-                    }
-                    curr = curr.next;
-                }
-                final var v = createFunction.apply(k);
-                table[index] = new Node<>(k, v, node);
-                if (++size > maxFill) {
-                    resize();
-                }
-                return v;
-            } finally {
-                unlockWrite(stamp);
-            }
-        }
-
-        /**
          * Recursive variant: probes under the read lock, runs the function with
          * every lock released so it may call back into this cache, and finally
          * stores the result under the write lock, keeping the value computed by
          * another thread if one landed first.
          */
-        private V getCacheRecursive(final K k, final int mix, Function<? super K, ? extends V> createFunction) {
+        private V getCache(final K k, final int mix, Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction) {
             long stamp = readLock();
             try {
                 Node<K, V> curr = table[mix & mask];
@@ -198,17 +147,18 @@ public final class IdentityHashCache<K, V> extends Segmented<IdentityHashCache.S
             }
             // Run outside all locks so the function may call back into this cache.
             final var v = createFunction.apply(k);
+            final var k1 = keyMappingFunction.apply(k);
             stamp = writeLock();
             try {
                 final int index = mix & mask;
                 Node<K, V> curr = table[index];
                 while (curr != null) {
-                    if (curr.key == k) {
+                    if (curr.key == k1) {
                         return curr.value;
                     }
                     curr = curr.next;
                 }
-                table[index] = new Node<>(k, v, table[index]);
+                table[index] = new Node<>(k1, v, table[index]);
                 if (++size > maxFill) {
                     resize();
                 }
@@ -218,7 +168,9 @@ public final class IdentityHashCache<K, V> extends Segmented<IdentityHashCache.S
             }
         }
 
-        /** Read-only lookup; never stores anything. */
+        /**
+         * Read-only lookup; never stores anything.
+         */
         private V getIfAbsent(final K k, final int mix) {
             long stamp = readLock();
             try {
@@ -236,7 +188,9 @@ public final class IdentityHashCache<K, V> extends Segmented<IdentityHashCache.S
             }
         }
 
-        /** Inserts only if absent, returning the value now bound to the key. */
+        /**
+         * Inserts only if absent, returning the value now bound to the key.
+         */
         private V put(final K k, final V v, final int mix) {
             long stamp = writeLock();
             try {
@@ -259,7 +213,10 @@ public final class IdentityHashCache<K, V> extends Segmented<IdentityHashCache.S
             }
         }
     }
-    /** A single entry in a chain; immutable except for {@code next}. */
+
+    /**
+     * A single entry in a chain; immutable except for {@code next}.
+     */
     static final class Node<K, V> implements ChainNode<Node<K, V>> {
 
         private final K key;

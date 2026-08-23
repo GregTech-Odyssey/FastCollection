@@ -37,7 +37,9 @@ import java.util.function.Supplier;
  */
 public interface NestedMultiMap<K1, K2, V> {
 
-    /** Creates a nested multimap backed by {@code map}, with inner structures from the factories. */
+    /**
+     * Creates a nested multimap backed by {@code map}, with inner structures from the factories.
+     */
     static <K1, K2, V> NestedMultiMap<K1, K2, V> create(
             Map<K1, Map<K2, Collection<V>>> map,
             Supplier<Map<K2, Collection<V>>> mapFactory,
@@ -65,7 +67,9 @@ public interface NestedMultiMap<K1, K2, V> {
         return new NestedMultiMapWrapper<>(new Reference2ReferenceOpenHashMap<>(), mapFactory, collectionFactory);
     }
 
-    /** The backing map, for direct (unwrapped) iteration. */
+    /**
+     * The backing map, for direct (unwrapped) iteration.
+     */
     Map<K1, Map<K2, Collection<V>>> getMap();
 
     /**
@@ -181,7 +185,9 @@ public interface NestedMultiMap<K1, K2, V> {
      */
     Map<K2, Collection<V>> remove(K1 k1);
 
-    /** The number of first-level keys, i.e. of non-empty inner maps. */
+    /**
+     * The number of first-level keys, i.e. of non-empty inner maps.
+     */
     int size();
 
     /**
@@ -200,10 +206,14 @@ public interface NestedMultiMap<K1, K2, V> {
      */
     void forEach(TriConsumer<? super K1, ? super K2, ? super V> action);
 
-    /** Whether no first-level key has entries. */
+    /**
+     * Whether no first-level key has entries.
+     */
     boolean isEmpty();
 
-    /** Removes all keys and values. */
+    /**
+     * Removes all keys and values.
+     */
     void clear();
 
     /**
@@ -364,7 +374,7 @@ public interface NestedMultiMap<K1, K2, V> {
 
         @Override
         public void forEach(TriConsumer<? super K1, ? super K2, ? super V> action) {
-            map.forEach((k1,v1s)-> v1s.forEach((k2, v2s)->v2s.forEach(v->action.accept(k1,k2,v))));
+            map.forEach((k1, v1s) -> v1s.forEach((k2, v2s) -> v2s.forEach(v -> action.accept(k1, k2, v))));
         }
 
         @Override
@@ -377,7 +387,9 @@ public interface NestedMultiMap<K1, K2, V> {
             map.clear();
         }
 
-        /** The value collection under {@code (k1, k2)}, created (level by level) if absent. */
+        /**
+         * The value collection under {@code (k1, k2)}, created (level by level) if absent.
+         */
         private Collection<V> valuesFor(K1 k1, K2 k2) {
             Map<K2, Collection<V>> innerMap;
             if (isRefMap) {

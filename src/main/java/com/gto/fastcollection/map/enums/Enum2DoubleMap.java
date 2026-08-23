@@ -53,21 +53,27 @@ public final class Enum2DoubleMap<K extends Enum<K>> extends AbstractReference2D
     private final ReferenceSet<K> keySet = new KeySet();
     private final DoubleCollection values = new Values();
 
-    /** Creates an empty map able to hold every constant of {@code keyType}. */
+    /**
+     * Creates an empty map able to hold every constant of {@code keyType}.
+     */
     public Enum2DoubleMap(Class<K> keyType) {
         this.keyType = keyType;
         this.keys = EnumKeys.universe(keyType);
         this.vals = new double[keys.length];
     }
 
-    /** Creates a copy of {@code map}. */
+    /**
+     * Creates a copy of {@code map}.
+     */
     public Enum2DoubleMap(Enum2DoubleMap<K> map) {
         this(map.keyType);
         System.arraycopy(map.vals, 0, vals, 0, vals.length);
         this.size = map.size;
     }
 
-    /** The enum type this map is indexed by. */
+    /**
+     * The enum type this map is indexed by.
+     */
     public Class<K> keyType() {
         return keyType;
     }
@@ -215,7 +221,7 @@ public final class Enum2DoubleMap<K extends Enum<K>> extends AbstractReference2D
         int i = key.ordinal();
         double v = vals[i];
         if (v != 0D) return v;
-        double newValue = (double) mappingFunction.applyAsDouble(key);
+        double newValue = mappingFunction.applyAsDouble(key);
         if (newValue != 0D) {
             vals[i] = newValue;
             size++;
@@ -283,7 +289,7 @@ public final class Enum2DoubleMap<K extends Enum<K>> extends AbstractReference2D
             size++;
             return defRetValue;
         }
-        double sum = (double) (old + incr);
+        double sum = old + incr;
         vals[i] = sum;
         if (sum == 0D) size--;
         return old;
@@ -325,13 +331,15 @@ public final class Enum2DoubleMap<K extends Enum<K>> extends AbstractReference2D
             return new EntryIterator();
         }
 
-        /** Feeds a single reused entry to {@code consumer}: no per-entry allocation. */
+        /**
+         * Feeds a single reused entry to {@code consumer}: no per-entry allocation.
+         */
         @Override
         public void fastForEach(Consumer<? super Reference2DoubleMap.Entry<K>> consumer) {
             Entry entry = new Entry();
             final var vals = Enum2DoubleMap.this.vals;
-        final int length = vals.length;
-        for (int i = 0; i < length; i++) {
+            final int length = vals.length;
+            for (int i = 0; i < length; i++) {
                 if (vals[i] != 0D) {
                     entry.index = i;
                     consumer.accept(entry);
@@ -351,8 +359,7 @@ public final class Enum2DoubleMap<K extends Enum<K>> extends AbstractReference2D
 
         @Override
         public boolean contains(Object o) {
-            if (!(o instanceof Map.Entry)) return false;
-            var e = (Map.Entry<?, ?>) o;
+            if (!(o instanceof Map.Entry<?, ?> e)) return false;
             if (!isValidKey(e.getKey())) return false;
             int i = ((Enum<?>) e.getKey()).ordinal();
             return vals[i] != 0D && Double.valueOf(vals[i]).equals(e.getValue());
@@ -366,7 +373,9 @@ public final class Enum2DoubleMap<K extends Enum<K>> extends AbstractReference2D
         }
     }
 
-    /** A reused, index-backed entry; valid only while its iterator stands still. */
+    /**
+     * A reused, index-backed entry; valid only while its iterator stands still.
+     */
     private final class Entry implements Reference2DoubleMap.Entry<K> {
 
         private int index = -1;
@@ -390,8 +399,7 @@ public final class Enum2DoubleMap<K extends Enum<K>> extends AbstractReference2D
 
         @Override
         public boolean equals(Object o) {
-            if (!(o instanceof Map.Entry)) return false;
-            var e = (Map.Entry<?, ?>) o;
+            if (!(o instanceof Map.Entry<?, ?> e)) return false;
             return e.getKey() == keys[index] && Double.valueOf(vals[index]).equals(e.getValue());
         }
 

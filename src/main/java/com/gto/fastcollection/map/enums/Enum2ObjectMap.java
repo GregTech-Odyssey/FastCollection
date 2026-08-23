@@ -41,7 +41,9 @@ import java.util.function.Consumer;
  */
 public final class Enum2ObjectMap<K extends Enum<K>, V> extends AbstractReference2ReferenceMap<K, V> {
 
-    /** Distinguishes a bound {@code null} value from an empty slot. */
+    /**
+     * Distinguishes a bound {@code null} value from an empty slot.
+     */
     private static final Object NULL = new Object();
 
     private final Class<K> keyType;
@@ -53,21 +55,27 @@ public final class Enum2ObjectMap<K extends Enum<K>, V> extends AbstractReferenc
     private final ReferenceSet<K> keySet = new KeySet();
     private final ReferenceCollection<V> values = new Values();
 
-    /** Creates an empty map able to hold every constant of {@code keyType}. */
+    /**
+     * Creates an empty map able to hold every constant of {@code keyType}.
+     */
     public Enum2ObjectMap(Class<K> keyType) {
         this.keyType = keyType;
         this.keys = EnumKeys.universe(keyType);
         this.vals = new Object[keys.length];
     }
 
-    /** Creates a copy of {@code map}. */
+    /**
+     * Creates a copy of {@code map}.
+     */
     public Enum2ObjectMap(Enum2ObjectMap<K, V> map) {
         this(map.keyType);
         System.arraycopy(map.vals, 0, vals, 0, vals.length);
         this.size = map.size;
     }
 
-    /** The enum type this map is indexed by. */
+    /**
+     * The enum type this map is indexed by.
+     */
     public Class<K> keyType() {
         return keyType;
     }
@@ -287,13 +295,15 @@ public final class Enum2ObjectMap<K extends Enum<K>, V> extends AbstractReferenc
             return new EntryIterator();
         }
 
-        /** Feeds a single reused entry to {@code consumer}: no per-entry allocation. */
+        /**
+         * Feeds a single reused entry to {@code consumer}: no per-entry allocation.
+         */
         @Override
         public void fastForEach(Consumer<? super Reference2ReferenceMap.Entry<K, V>> consumer) {
             Entry entry = new Entry();
             final var vals = Enum2ObjectMap.this.vals;
-        final int length = vals.length;
-        for (int i = 0; i < length; i++) {
+            final int length = vals.length;
+            for (int i = 0; i < length; i++) {
                 if (vals[i] != null) {
                     entry.index = i;
                     consumer.accept(entry);
@@ -313,8 +323,7 @@ public final class Enum2ObjectMap<K extends Enum<K>, V> extends AbstractReferenc
 
         @Override
         public boolean contains(Object o) {
-            if (!(o instanceof Map.Entry)) return false;
-            var e = (Map.Entry<?, ?>) o;
+            if (!(o instanceof Map.Entry<?, ?> e)) return false;
             if (!isValidKey(e.getKey())) return false;
             int i = ((Enum<?>) e.getKey()).ordinal();
             return vals[i] != null && Objects.equals(unmaskNull(vals[i]), e.getValue());
@@ -328,7 +337,9 @@ public final class Enum2ObjectMap<K extends Enum<K>, V> extends AbstractReferenc
         }
     }
 
-    /** A reused, index-backed entry; valid only while its iterator stands still. */
+    /**
+     * A reused, index-backed entry; valid only while its iterator stands still.
+     */
     private final class Entry implements Reference2ReferenceMap.Entry<K, V> {
 
         private int index = -1;
@@ -352,8 +363,7 @@ public final class Enum2ObjectMap<K extends Enum<K>, V> extends AbstractReferenc
 
         @Override
         public boolean equals(Object o) {
-            if (!(o instanceof Map.Entry)) return false;
-            var e = (Map.Entry<?, ?>) o;
+            if (!(o instanceof Map.Entry<?, ?> e)) return false;
             return e.getKey() == keys[index] && Objects.equals(getValue(), e.getValue());
         }
 

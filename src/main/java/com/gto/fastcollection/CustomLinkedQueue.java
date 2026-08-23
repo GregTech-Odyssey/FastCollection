@@ -28,7 +28,7 @@ public class CustomLinkedQueue<T extends CustomLinkedQueue.LinkNode<T>> implemen
         return last;
     }
 
-    public void addLast( T node) {
+    public void addLast(T node) {
         final T l = last;
         if (l == null) {
             first = node;
@@ -40,7 +40,7 @@ public class CustomLinkedQueue<T extends CustomLinkedQueue.LinkNode<T>> implemen
         size++;
     }
 
-    public void addFirst( T node) {
+    public void addFirst(T node) {
         final T f = first;
         if (f == null) {
             last = node;
@@ -52,7 +52,7 @@ public class CustomLinkedQueue<T extends CustomLinkedQueue.LinkNode<T>> implemen
         size++;
     }
 
-    public void unlink( T node) {
+    public void unlink(T node) {
         final T prev = node.getPrev();
         final T next = node.getNext();
         if (prev == null) {
@@ -70,7 +70,7 @@ public class CustomLinkedQueue<T extends CustomLinkedQueue.LinkNode<T>> implemen
         size--;
     }
 
-    public boolean remove( T node) {
+    public boolean remove(T node) {
         if (node.getPrev() != null || node.getNext() != null || node == first) {
             unlink(node);
             return true;
@@ -105,7 +105,7 @@ public class CustomLinkedQueue<T extends CustomLinkedQueue.LinkNode<T>> implemen
         return l;
     }
 
-    public void merge( CustomLinkedQueue<T> other) {
+    public void merge(CustomLinkedQueue<T> other) {
         if (other.first == null || other == this) return;
         final T otherFirst = other.first;
         final T otherLast = other.last;
@@ -123,7 +123,7 @@ public class CustomLinkedQueue<T extends CustomLinkedQueue.LinkNode<T>> implemen
     }
 
     public void clear() {
-        for (T node = first; node != null;) {
+        for (T node = first; node != null; ) {
             T next = node.getNext();
             node.setPrev(null);
             node.setNext(null);
@@ -204,11 +204,11 @@ public class CustomLinkedQueue<T extends CustomLinkedQueue.LinkNode<T>> implemen
 
         T getPrev();
 
-        void setPrev( T prev);
+        void setPrev(T prev);
 
         T getNext();
 
-        void setNext( T next);
+        void setNext(T next);
     }
 
     public abstract static class AbstractLinkNode<T extends AbstractLinkNode<T>> implements LinkNode<T> {
@@ -218,22 +218,22 @@ public class CustomLinkedQueue<T extends CustomLinkedQueue.LinkNode<T>> implemen
         protected T next;
 
         @Override
-        public T getPrev(){
+        public T getPrev() {
             return prev;
         }
 
         @Override
-        public void setPrev( T prev){
+        public void setPrev(T prev) {
             this.prev = prev;
         }
 
         @Override
-        public T getNext(){
+        public T getNext() {
             return next;
         }
 
         @Override
-        public void setNext( T next){
+        public void setNext(T next) {
             this.next = next;
         }
     }

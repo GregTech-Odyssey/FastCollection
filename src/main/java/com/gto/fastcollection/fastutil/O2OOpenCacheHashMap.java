@@ -62,9 +62,9 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         final int[] hash = this.hash;
         final int mask = this.mask;
         a:
-        for (;;) {
+        for (; ; ) {
             pos = ((last = pos) + 1) & mask;
-            for (;;) {
+            for (; ; ) {
                 if ((curr = key[pos]) == null) {
                     key[last] = null;
                     value[last] = null;
@@ -394,7 +394,8 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
             this.index = index;
         }
 
-        MapEntry() {}
+        MapEntry() {
+        }
 
         @Override
         public K getKey() {
@@ -471,7 +472,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
             final K[] key = O2OOpenCacheHashMap.this.key;
             final int[] hash = O2OOpenCacheHashMap.this.hash;
             final int mask = O2OOpenCacheHashMap.this.mask;
-            for (;;) {
+            for (; ; ) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
                     final K k = wrapped.get(-pos - 1);
@@ -515,9 +516,9 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
             final V[] value = O2OOpenCacheHashMap.this.value;
             final int[] hash = O2OOpenCacheHashMap.this.hash;
             final int mask = O2OOpenCacheHashMap.this.mask;
-            for (;;) {
+            for (; ; ) {
                 pos = ((last = pos) + 1) & mask;
-                for (;;) {
+                for (; ; ) {
                     if ((curr = key[pos]) == null) {
                         key[last] = (null);
                         value[last] = null;
@@ -608,7 +609,8 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         boolean mustReturnNull = O2OOpenCacheHashMap.this.containsNullKey;
         boolean hasSplit = false;
 
-        MapSpliterator() {}
+        MapSpliterator() {
+        }
 
         MapSpliterator(int pos, int max, boolean mustReturnNull, boolean hasSplit) {
             this.pos = pos;
@@ -700,7 +702,8 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
 
         private static final int POST_SPLIT_CHARACTERISTICS = ObjectSpliterators.SET_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
 
-        EntrySpliterator() {}
+        EntrySpliterator() {
+        }
 
         EntrySpliterator(int pos, int max, boolean mustReturnNull, boolean hasSplit) {
             super(pos, max, mustReturnNull, hasSplit);
@@ -742,7 +745,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         @Override
         public boolean containsAll(Collection<?> c) {
             if (c instanceof Object2ObjectMap.FastEntrySet set) {
-                for (ObjectIterator it = set.fastIterator(); it.hasNext();) if (!contains(it.next())) return false;
+                for (ObjectIterator it = set.fastIterator(); it.hasNext(); ) if (!contains(it.next())) return false;
             } else {
                 for (Object e : c) if (!contains(e)) return false;
             }
@@ -752,8 +755,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         @Override
         @SuppressWarnings("unchecked")
         public boolean contains(final Object o) {
-            if (!(o instanceof Map.Entry)) return false;
-            final Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
+            if (!(o instanceof java.util.Map.Entry<?, ?> e)) return false;
             final K k = ((K) e.getKey());
             final V v = ((V) e.getValue());
             if (k == null) return O2OOpenCacheHashMap.this.containsNullKey && Objects.equals(value[n], v);
@@ -774,8 +776,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         @Override
         @SuppressWarnings("unchecked")
         public boolean remove(final Object o) {
-            if (!(o instanceof Map.Entry)) return false;
-            final Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
+            if (!(o instanceof java.util.Map.Entry<?, ?> e)) return false;
             final K k = ((K) e.getKey());
             final V v = ((V) e.getValue());
             if (k == null) {
@@ -824,7 +825,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         public void forEach(final Consumer<? super Entry<K, V>> consumer) {
             if (containsNullKey) consumer.accept(new MapEntry(n));
             final K[] key = O2OOpenCacheHashMap.this.key;
-            for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) consumer.accept(new MapEntry(pos));
+            for (int pos = n; pos-- != 0; ) if (!((key[pos]) == null)) consumer.accept(new MapEntry(pos));
         }
 
         @Override
@@ -835,10 +836,11 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
                 consumer.accept(entry);
             }
             final K[] key = O2OOpenCacheHashMap.this.key;
-            for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) {
-                entry.index = pos;
-                consumer.accept(entry);
-            }
+            for (int pos = n; pos-- != 0; )
+                if (!((key[pos]) == null)) {
+                    entry.index = pos;
+                    consumer.accept(entry);
+                }
         }
     }
 
@@ -869,7 +871,8 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
 
         private static final int POST_SPLIT_CHARACTERISTICS = ObjectSpliterators.SET_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
 
-        KeySpliterator() {}
+        KeySpliterator() {
+        }
 
         KeySpliterator(int pos, int max, boolean mustReturnNull, boolean hasSplit) {
             super(pos, max, mustReturnNull, hasSplit);
@@ -907,7 +910,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         public void forEach(final Consumer<? super K> consumer) {
             final K[] key = O2OOpenCacheHashMap.this.key;
             if (containsNullKey) consumer.accept(key[n]);
-            for (int pos = n; pos-- != 0;) {
+            for (int pos = n; pos-- != 0; ) {
                 final K k = key[pos];
                 if (!((k) == null)) consumer.accept(k);
             }
@@ -963,7 +966,8 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
 
         private static final int POST_SPLIT_CHARACTERISTICS = ObjectSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
 
-        ValueSpliterator() {}
+        ValueSpliterator() {
+        }
 
         ValueSpliterator(int pos, int max, boolean mustReturnNull, boolean hasSplit) {
             super(pos, max, mustReturnNull, hasSplit);
@@ -1004,7 +1008,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
                 final K[] key = O2OOpenCacheHashMap.this.key;
                 final V[] value = O2OOpenCacheHashMap.this.value;
                 if (containsNullKey) consumer.accept(value[n]);
-                for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) consumer.accept(value[pos]);
+                for (int pos = n; pos-- != 0; ) if (!((key[pos]) == null)) consumer.accept(value[pos]);
             }
 
             @Override
@@ -1035,9 +1039,10 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         final V[] newValue = (V[]) new Object[newN + 1];
         final int[] newHash = new int[newN + 1];
         int i = n, pos, h;
-        for (int j = containsNullKey ? size - 1 : size; j-- != 0;) {
-            while (((key[--i]) == null));
-            if (!((newKey[pos = HashCommon.mix(h = hash[i]) & mask]) == null)) while (!((newKey[pos = (pos + 1) & mask]) == null));
+        for (int j = containsNullKey ? size - 1 : size; j-- != 0; ) {
+            while (((key[--i]) == null)) ;
+            if (!((newKey[pos = HashCommon.mix(h = hash[i]) & mask]) == null))
+                while (!((newKey[pos = (pos + 1) & mask]) == null)) ;
             newKey[pos] = key[i];
             newValue[pos] = value[i];
             newHash[pos] = h;
@@ -1064,7 +1069,7 @@ public final class O2OOpenCacheHashMap<K, V> extends Object2ObjectOpenHashMap<K,
         final K[] key = this.key;
         final V[] value = this.value;
         final int[] hash = this.hash;
-        for (int j = containsNullKey ? size - 1 : size, i = 0, t = 0; j-- != 0;) {
+        for (int j = containsNullKey ? size - 1 : size, i = 0, t = 0; j-- != 0; ) {
             while ((key[i]) == null) i++;
             if (this != key[i]) t = hash[i];
             if (this != value[i]) t ^= (value[i] == null ? 0 : value[i].hashCode());

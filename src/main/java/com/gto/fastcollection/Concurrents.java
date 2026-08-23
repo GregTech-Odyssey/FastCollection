@@ -8,6 +8,8 @@ public final class Concurrents {
     private Concurrents() {
     }
 
-    /** Cached number of available processors; the default segment count for striped structures. */
+    /**
+     * Cached number of available processors; the default segment count for striped structures.
+     */
     public static final int NCPU = Runtime.getRuntime().availableProcessors();
 }

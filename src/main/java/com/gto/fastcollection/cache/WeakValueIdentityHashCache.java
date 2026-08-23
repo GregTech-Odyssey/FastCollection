@@ -8,6 +8,7 @@ import java.lang.ref.WeakReference;
 import java.util.Arrays;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 
@@ -22,25 +23,15 @@ import static it.unimi.dsi.fastutil.HashCommon.arraySize;
  */
 public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueIdentityHashCache.Segment<K, V>> implements MapCache<K, V>, ICleanableCache {
 
-    private final Function<? super K, ? extends V> createFunction;
-
-    /** Creates a cache with default concurrency and no factory. */
-    public WeakValueIdentityHashCache() {
-        this(Concurrents.NCPU, null);
-    }
 
     /**
      * Creates a cache with default concurrency and the given factory;
      * {@code null} is allowed and behaves like the no-factory constructor.
      */
-    public WeakValueIdentityHashCache(Function<? super K, ? extends V> createFunction) {
-        this(Concurrents.NCPU, createFunction);
+    public WeakValueIdentityHashCache() {
+        this(Concurrents.NCPU);
     }
 
-    /** Creates a cache with the given concurrency level and no factory. */
-    public WeakValueIdentityHashCache(int concurrencyLevel) {
-        this(concurrencyLevel, null);
-    }
 
     /**
      * Creates a cache with the given concurrency level and factory; registers
@@ -48,49 +39,42 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
      *
      * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
      */
-    public WeakValueIdentityHashCache(int concurrencyLevel, Function<? super K, ? extends V> createFunction) {
+    public WeakValueIdentityHashCache(int concurrencyLevel) {
         super(concurrencyLevel, i -> new Segment<>());
-        this.createFunction = createFunction;
         CacheCleaner.add(this);
     }
 
-    /** {@inheritDoc} */
-    @Override
-    public Function<? super K, ? extends V> createFunction() {
-        return this.createFunction;
-    }
-
-    /** {@inheritDoc} The function runs under the segment's write lock; it must not recurse. */
     @Override
     public V getCache(final K k, Function<? super K, ? extends V> createFunction) {
         int hash = System.identityHashCode(k);
         int mix = HashCommon.mix(hash);
-        return segmentFor(mix).getCache(k, mix, createFunction);
+        return segmentFor(mix).getCache(k, mix, createFunction, Interner.identityMappingFunction());
     }
 
-    /** {@inheritDoc} Uses the constructor factory. */
     @Override
-    public V getCache(final K k) {
+    public V getCache(K k, Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction) {
         int hash = System.identityHashCode(k);
         int mix = HashCommon.mix(hash);
-        return segmentFor(mix).getCache(k, mix, createFunction);
+        return segmentFor(mix).getCache(k, mix, createFunction, keyMappingFunction);
     }
 
-    /** {@inheritDoc} Runs the function outside all locks, so it may recurse. */
     @Override
     public V getCacheRecursive(final K k, Function<? super K, ? extends V> createFunction) {
         int hash = System.identityHashCode(k);
         int mix = HashCommon.mix(hash);
-        return segmentFor(mix).getCacheRecursive(k, mix, createFunction);
+        return segmentFor(mix).getCache(k, mix, createFunction, Interner.identityMappingFunction());
     }
 
-    /** {@inheritDoc} Uses the constructor factory. */
     @Override
-    public V getCacheRecursive(final K k) {
-        return getCacheRecursive(k, createFunction);
+    public V getCacheRecursive(final K k, Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction) {
+        int hash = System.identityHashCode(k);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).getCache(k, mix, createFunction, keyMappingFunction);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public V getIfPresent(final K k) {
         int hash = System.identityHashCode(k);
@@ -98,7 +82,9 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
         return segmentFor(mix).getIfAbsent(k, mix);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public V putIfAbsent(final K k, final V v) {
         int hash = System.identityHashCode(k);
@@ -106,13 +92,17 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
         return segmentFor(mix).put(k, v, mix);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void clear() {
         clearSegments();
     }
 
-    /** {@inheritDoc} Drops every entry whose value has been collected. */
+    /**
+     * {@inheritDoc} Drops every entry whose value has been collected.
+     */
     @Override
     public void clearCache() {
         sweepSegments();
@@ -147,69 +137,13 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
         }
 
         /**
-         * Locked variant: probes under the read lock, then computes the value
-         * with the function while holding the write lock — replacing a dead
-         * node if one occupies the slot — so the function runs exactly once
-         * per live key; it must not call back into this cache.
-         */
-        private V getCache(final K k, final int mix, Function<? super K, ? extends V> createFunction) {
-            long stamp = readLock();
-            try {
-                Node<K, V> curr = table[mix & mask];
-                while (curr != null) {
-                    if (curr.key == k) {
-                        V v = curr.get();
-                        if (v != null) return v;
-                        break;
-                    }
-                    curr = curr.next;
-                }
-            } finally {
-                unlockRead(stamp);
-            }
-            stamp = writeLock();
-            try {
-                final int index = mix & mask;
-                final Node<K, V> node = table[index];
-                Node<K, V> prev = null;
-                Node<K, V> curr = node;
-                while (curr != null) {
-                    if (curr.key == k) {
-                        V existing = curr.get();
-                        if (existing != null) {
-                            return existing;
-                        }
-                        final var v = createFunction.apply(k);
-                        var n = new Node<>(k, v, curr.next);
-                        if (prev == null) {
-                            table[index] = n;
-                        } else {
-                            prev.next = n;
-                        }
-                        return v;
-                    }
-                    prev = curr;
-                    curr = curr.next;
-                }
-                final var v = createFunction.apply(k);
-                table[index] = new Node<>(k, v, node);
-                if (++size > maxFill) {
-                    resize();
-                }
-                return v;
-            } finally {
-                unlockWrite(stamp);
-            }
-        }
-
-        /**
          * Recursive variant: probes under the read lock, runs the function with
          * every lock released so it may call back into this cache, and finally
          * stores the result under the write lock — replacing a dead node if one
          * occupies the slot, or keeping another thread's value if it landed
          * first.
          */
-        private V getCacheRecursive(final K k, final int mix, Function<? super K, ? extends V> createFunction) {
+        private V getCache(final K k, final int mix, Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction) {
             long stamp = readLock();
             try {
                 Node<K, V> curr = table[mix & mask];
@@ -226,6 +160,7 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
             }
             // Run outside all locks so the function may call back into this cache.
             final var v = createFunction.apply(k);
+            final var k1 = keyMappingFunction.apply(k);
             stamp = writeLock();
             try {
                 final int index = mix & mask;
@@ -233,13 +168,13 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
                 Node<K, V> prev = null;
                 Node<K, V> curr = node;
                 while (curr != null) {
-                    if (curr.key == k) {
+                    if (curr.key == k1) {
                         V existing = curr.get();
                         if (existing != null) {
                             return existing;
                         }
                         // value was collected: replace the dead node with the computed value
-                        var n = new Node<>(k, v, curr.next);
+                        var n = new Node<>(k1, v, curr.next);
                         if (prev == null) {
                             table[index] = n;
                         } else {
@@ -250,7 +185,7 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
                     prev = curr;
                     curr = curr.next;
                 }
-                table[index] = new Node<>(k, v, node);
+                table[index] = new Node<>(k1, v, node);
                 if (++size > maxFill) {
                     resize();
                 }
@@ -260,7 +195,9 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
             }
         }
 
-        /** Read-only lookup; never mutates the chain. */
+        /**
+         * Read-only lookup; never mutates the chain.
+         */
         private V getIfAbsent(final K k, final int mix) {
             long stamp = readLock();
             try {
@@ -278,7 +215,9 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
             }
         }
 
-        /** Inserts only if absent, replacing a dead node; returns the value now bound. */
+        /**
+         * Inserts only if absent, replacing a dead node; returns the value now bound.
+         */
         private V put(final K k, final V v, final int mix) {
             long stamp = writeLock();
             try {

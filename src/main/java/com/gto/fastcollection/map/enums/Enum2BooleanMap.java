@@ -53,21 +53,27 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
     private final ReferenceSet<K> keySet = new KeySet();
     private final BooleanCollection values = new Values();
 
-    /** Creates an empty map able to hold every constant of {@code keyType}. */
+    /**
+     * Creates an empty map able to hold every constant of {@code keyType}.
+     */
     public Enum2BooleanMap(Class<K> keyType) {
         this.keyType = keyType;
         this.keys = EnumKeys.universe(keyType);
         this.vals = new boolean[keys.length];
     }
 
-    /** Creates a copy of {@code map}. */
+    /**
+     * Creates a copy of {@code map}.
+     */
     public Enum2BooleanMap(Enum2BooleanMap<K> map) {
         this(map.keyType);
         System.arraycopy(map.vals, 0, vals, 0, vals.length);
         this.size = map.size;
     }
 
-    /** The enum type this map is indexed by. */
+    /**
+     * The enum type this map is indexed by.
+     */
     public Class<K> keyType() {
         return keyType;
     }
@@ -76,14 +82,14 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
     public boolean getBoolean(Object key) {
         if (!isValidKey(key)) return defRetValue;
         boolean v = vals[((Enum<?>) key).ordinal()];
-        return v != false ? v : defRetValue;
+        return v ? v : defRetValue;
     }
 
     @Override
     public boolean getOrDefault(Object key, boolean defaultValue) {
         if (!isValidKey(key)) return defaultValue;
         boolean v = vals[((Enum<?>) key).ordinal()];
-        return v != false ? v : defaultValue;
+        return v ? v : defaultValue;
     }
 
     /**
@@ -97,12 +103,12 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
         int i = key.ordinal();
         boolean old = vals[i];
         vals[i] = value;
-        if (value == false) {
-            if (old != false) size--;
-        } else if (old == false) {
+        if (!value) {
+            if (old) size--;
+        } else if (!old) {
             size++;
         }
-        return old != false ? old : defRetValue;
+        return old ? old : defRetValue;
     }
 
     @Override
@@ -110,7 +116,7 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
         if (!isValidKey(key)) return defRetValue;
         int i = ((Enum<?>) key).ordinal();
         boolean old = vals[i];
-        if (old == false) return defRetValue;
+        if (!old) return defRetValue;
         vals[i] = false;
         size--;
         return old;
@@ -118,12 +124,12 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
 
     @Override
     public boolean containsKey(Object key) {
-        return isValidKey(key) && vals[((Enum<?>) key).ordinal()] != false;
+        return isValidKey(key) && vals[((Enum<?>) key).ordinal()];
     }
 
     @Override
     public boolean containsValue(boolean value) {
-        if (value == false) return false;
+        if (!value) return false;
         final var vals = Enum2BooleanMap.this.vals;
         final int length = vals.length;
         for (int i = 0; i < length; i++) {
@@ -149,7 +155,7 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
         final var vals = Enum2BooleanMap.this.vals;
         final int length = vals.length;
         for (int i = 0; i < length; i++) {
-            if (vals[i] != false) action.accept(keys[i], Boolean.valueOf(vals[i]));
+            if (vals[i]) action.accept(keys[i], Boolean.valueOf(vals[i]));
         }
     }
 
@@ -177,8 +183,8 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
     public boolean putIfAbsent(K key, boolean value) {
         int i = key.ordinal();
         boolean old = vals[i];
-        if (old != false) return old;
-        if (value != false) {
+        if (old) return old;
+        if (value) {
             vals[i] = value;
             size++;
         }
@@ -187,7 +193,7 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
 
     @Override
     public boolean remove(Object key, boolean value) {
-        if (value == false || !isValidKey(key)) return false;
+        if (!value || !isValidKey(key)) return false;
         int i = ((Enum<?>) key).ordinal();
         if (vals[i] != value) return false;
         vals[i] = false;
@@ -197,7 +203,7 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
 
     @Override
     public boolean replace(K key, boolean oldValue, boolean newValue) {
-        if (oldValue == false || vals[key.ordinal()] != oldValue) return false;
+        if (!oldValue || vals[key.ordinal()] != oldValue) return false;
         put(key, newValue);
         return true;
     }
@@ -205,7 +211,7 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
     @Override
     public boolean replace(K key, boolean value) {
         boolean old = vals[key.ordinal()];
-        if (old == false) return defRetValue;
+        if (!old) return defRetValue;
         put(key, value);
         return old;
     }
@@ -214,9 +220,9 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
     public boolean computeIfAbsent(K key, java.util.function.Predicate<? super K> mappingFunction) {
         int i = key.ordinal();
         boolean v = vals[i];
-        if (v != false) return v;
-        boolean newValue = (boolean) mappingFunction.test(key);
-        if (newValue != false) {
+        if (v) return v;
+        boolean newValue = mappingFunction.test(key);
+        if (newValue) {
             vals[i] = newValue;
             size++;
         }
@@ -227,9 +233,9 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
     public boolean computeIfAbsent(K key, Reference2BooleanFunction<? super K> mappingFunction) {
         int i = key.ordinal();
         boolean v = vals[i];
-        if (v != false) return v;
+        if (v) return v;
         boolean newValue = mappingFunction.getBoolean(key);
-        if (newValue != false) {
+        if (newValue) {
             vals[i] = newValue;
             size++;
         }
@@ -240,7 +246,7 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
     public boolean computeBooleanIfPresent(K key, java.util.function.BiFunction<? super K, ? super Boolean, ? extends Boolean> remappingFunction) {
         int i = key.ordinal();
         boolean old = vals[i];
-        if (old == false) return defRetValue;
+        if (!old) return defRetValue;
         Boolean newValue = remappingFunction.apply(key, Boolean.valueOf(old));
         if (newValue == null) {
             vals[i] = false;
@@ -255,9 +261,9 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
     public boolean computeBoolean(K key, java.util.function.BiFunction<? super K, ? super Boolean, ? extends Boolean> remappingFunction) {
         int i = key.ordinal();
         boolean old = vals[i];
-        Boolean newValue = remappingFunction.apply(key, old == false ? null : Boolean.valueOf(old));
+        Boolean newValue = remappingFunction.apply(key, !old ? null : Boolean.valueOf(old));
         if (newValue == null) {
-            if (old != false) {
+            if (old) {
                 vals[i] = false;
                 size--;
             }
@@ -286,14 +292,16 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
             return new EntryIterator();
         }
 
-        /** Feeds a single reused entry to {@code consumer}: no per-entry allocation. */
+        /**
+         * Feeds a single reused entry to {@code consumer}: no per-entry allocation.
+         */
         @Override
         public void fastForEach(Consumer<? super Reference2BooleanMap.Entry<K>> consumer) {
             Entry entry = new Entry();
             final var vals = Enum2BooleanMap.this.vals;
-        final int length = vals.length;
-        for (int i = 0; i < length; i++) {
-                if (vals[i] != false) {
+            final int length = vals.length;
+            for (int i = 0; i < length; i++) {
+                if (vals[i]) {
                     entry.index = i;
                     consumer.accept(entry);
                 }
@@ -312,11 +320,10 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
 
         @Override
         public boolean contains(Object o) {
-            if (!(o instanceof Map.Entry)) return false;
-            var e = (Map.Entry<?, ?>) o;
+            if (!(o instanceof Map.Entry<?, ?> e)) return false;
             if (!isValidKey(e.getKey())) return false;
             int i = ((Enum<?>) e.getKey()).ordinal();
-            return vals[i] != false && Boolean.valueOf(vals[i]).equals(e.getValue());
+            return vals[i] && Boolean.valueOf(vals[i]).equals(e.getValue());
         }
 
         @Override
@@ -327,7 +334,9 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
         }
     }
 
-    /** A reused, index-backed entry; valid only while its iterator stands still. */
+    /**
+     * A reused, index-backed entry; valid only while its iterator stands still.
+     */
     private final class Entry implements Reference2BooleanMap.Entry<K> {
 
         private int index = -1;
@@ -351,8 +360,7 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
 
         @Override
         public boolean equals(Object o) {
-            if (!(o instanceof Map.Entry)) return false;
-            var e = (Map.Entry<?, ?>) o;
+            if (!(o instanceof Map.Entry<?, ?> e)) return false;
             return e.getKey() == keys[index] && Boolean.valueOf(vals[index]).equals(e.getValue());
         }
 
@@ -375,7 +383,7 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
         public boolean hasNext() {
             final var vals = Enum2BooleanMap.this.vals;
             final int length = vals.length;
-            while (cursor < length && vals[cursor] == false) {
+            while (cursor < length && !vals[cursor]) {
                 cursor++;
             }
             return cursor < length;

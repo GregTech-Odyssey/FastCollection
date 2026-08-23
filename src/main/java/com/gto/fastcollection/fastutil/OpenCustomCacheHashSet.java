@@ -144,9 +144,9 @@ public final class OpenCustomCacheHashSet<K> extends ObjectOpenCustomHashSet<K> 
         final K[] key = this.key;
         final int[] hash = this.hash;
         a:
-        for (;;) {
+        for (; ; ) {
             pos = ((last = pos) + 1) & mask;
-            for (;;) {
+            for (; ; ) {
                 if ((curr = key[pos]) == null) {
                     key[last] = null;
                     hash[last] = 0;
@@ -179,8 +179,7 @@ public final class OpenCustomCacheHashSet<K> extends ObjectOpenCustomHashSet<K> 
             if (containsNull) return removeNullEntry();
             return false;
         }
-        @SuppressWarnings("unchecked")
-        final K kk = (K) k;
+        @SuppressWarnings("unchecked") final K kk = (K) k;
         final int h = strategy.hashCode(kk);
         K curr;
         final K[] key = this.key;
@@ -197,8 +196,7 @@ public final class OpenCustomCacheHashSet<K> extends ObjectOpenCustomHashSet<K> 
     @Override
     public boolean contains(final Object k) {
         if (k == null) return containsNull;
-        @SuppressWarnings("unchecked")
-        final K kk = (K) k;
+        @SuppressWarnings("unchecked") final K kk = (K) k;
         final int h = strategy.hashCode(kk);
         K curr;
         final K[] key = this.key;
@@ -215,8 +213,7 @@ public final class OpenCustomCacheHashSet<K> extends ObjectOpenCustomHashSet<K> 
     @Override
     public K get(final Object k) {
         if (k == null) return key[n];
-        @SuppressWarnings("unchecked")
-        final K kk = (K) k;
+        @SuppressWarnings("unchecked") final K kk = (K) k;
         final int h = strategy.hashCode(kk);
         K curr;
         final K[] key = this.key;
@@ -259,11 +256,11 @@ public final class OpenCustomCacheHashSet<K> extends ObjectOpenCustomHashSet<K> 
         final int[] newHash = new int[newN + 1];
         int i = n, pos, h;
         K k;
-        for (int j = realSize(); j-- != 0;) {
-            while ((k = key[--i]) == null);
+        for (int j = realSize(); j-- != 0; ) {
+            while ((k = key[--i]) == null) ;
             h = hash[i];
             pos = HashCommon.mix(h) & mask;
-            if (newKey[pos] != null) while ((newKey[pos = (pos + 1) & mask]) != null);
+            if (newKey[pos] != null) while ((newKey[pos = (pos + 1) & mask]) != null) ;
             newKey[pos] = k;
             newHash[pos] = h;
         }
@@ -286,7 +283,7 @@ public final class OpenCustomCacheHashSet<K> extends ObjectOpenCustomHashSet<K> 
         int h = 0;
         final K[] key = this.key;
         final int[] hash = this.hash;
-        for (int j = realSize(), i = 0; j-- != 0;) {
+        for (int j = realSize(), i = 0; j-- != 0; ) {
             while (key[i] == null) i++;
             if (this != key[i]) h += hash[i];
             i++;
@@ -316,7 +313,7 @@ public final class OpenCustomCacheHashSet<K> extends ObjectOpenCustomHashSet<K> 
                 last = n;
                 return key[n];
             }
-            for (;;) {
+            for (; ; ) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
                     return wrapped.get(-pos - 1);
@@ -330,9 +327,9 @@ public final class OpenCustomCacheHashSet<K> extends ObjectOpenCustomHashSet<K> 
             K curr;
             final K[] key = OpenCustomCacheHashSet.this.key;
             final int[] hash = OpenCustomCacheHashSet.this.hash;
-            for (;;) {
+            for (; ; ) {
                 pos = ((last = pos) + 1) & mask;
-                for (;;) {
+                for (; ; ) {
                     if ((curr = key[pos]) == null) {
                         key[last] = null;
                         hash[last] = 0;
@@ -400,7 +397,8 @@ public final class OpenCustomCacheHashSet<K> extends ObjectOpenCustomHashSet<K> 
         boolean mustReturnNull = OpenCustomCacheHashSet.this.containsNull;
         boolean hasSplit = false;
 
-        SetSpliterator() {}
+        SetSpliterator() {
+        }
 
         SetSpliterator(int pos, int max, boolean mustReturnNull, boolean hasSplit) {
             this.pos = pos;

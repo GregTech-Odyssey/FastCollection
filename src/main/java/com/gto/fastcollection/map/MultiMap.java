@@ -29,12 +29,16 @@ import java.util.function.Supplier;
  */
 public interface MultiMap<K, V> {
 
-    /** Creates a multimap backed by {@code map}, with collections from {@code factory}. */
+    /**
+     * Creates a multimap backed by {@code map}, with collections from {@code factory}.
+     */
     static <K, V> MultiMap<K, V> create(Map<K, Collection<V>> map, Supplier<Collection<V>> factory) {
         return new MultiMapWrapper<>(map, factory);
     }
 
-    /** Creates a multimap backed by a {@link HashMap}, with collections from {@code factory}. */
+    /**
+     * Creates a multimap backed by a {@link HashMap}, with collections from {@code factory}.
+     */
     static <K, V> MultiMap<K, V> create(Supplier<Collection<V>> factory) {
         return new MultiMapWrapper<>(new HashMap<>(), factory);
     }
@@ -47,7 +51,9 @@ public interface MultiMap<K, V> {
         return new MultiMapWrapper<>(new Reference2ReferenceOpenHashMap<>(), factory);
     }
 
-    /** The backing map, for direct (unwrapped) iteration. */
+    /**
+     * The backing map, for direct (unwrapped) iteration.
+     */
     Map<K, Collection<V>> getMap();
 
     /**
@@ -127,7 +133,9 @@ public interface MultiMap<K, V> {
      */
     Collection<V> remove(K key);
 
-    /** The number of keys, i.e. of non-empty value collections. */
+    /**
+     * The number of keys, i.e. of non-empty value collections.
+     */
     int size();
 
     /**
@@ -144,10 +152,14 @@ public interface MultiMap<K, V> {
      */
     void forEach(BiConsumer<? super K, ? super V> action);
 
-    /** Whether no key has values. */
+    /**
+     * Whether no key has values.
+     */
     boolean isEmpty();
 
-    /** Removes all keys and values. */
+    /**
+     * Removes all keys and values.
+     */
     void clear();
 
     /**
@@ -255,7 +267,7 @@ public interface MultiMap<K, V> {
 
         @Override
         public void forEach(BiConsumer<? super K, ? super V> action) {
-            map.forEach((k,vs)-> vs.forEach(v->action.accept(k,v)));
+            map.forEach((k, vs) -> vs.forEach(v -> action.accept(k, v)));
         }
 
         @Override

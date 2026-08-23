@@ -54,21 +54,27 @@ public final class Enum2ByteMap<K extends Enum<K>> extends AbstractReference2Byt
     private final ReferenceSet<K> keySet = new KeySet();
     private final ByteCollection values = new Values();
 
-    /** Creates an empty map able to hold every constant of {@code keyType}. */
+    /**
+     * Creates an empty map able to hold every constant of {@code keyType}.
+     */
     public Enum2ByteMap(Class<K> keyType) {
         this.keyType = keyType;
         this.keys = EnumKeys.universe(keyType);
         this.vals = new byte[keys.length];
     }
 
-    /** Creates a copy of {@code map}. */
+    /**
+     * Creates a copy of {@code map}.
+     */
     public Enum2ByteMap(Enum2ByteMap<K> map) {
         this(map.keyType);
         System.arraycopy(map.vals, 0, vals, 0, vals.length);
         this.size = map.size;
     }
 
-    /** The enum type this map is indexed by. */
+    /**
+     * The enum type this map is indexed by.
+     */
     public Class<K> keyType() {
         return keyType;
     }
@@ -326,13 +332,15 @@ public final class Enum2ByteMap<K extends Enum<K>> extends AbstractReference2Byt
             return new EntryIterator();
         }
 
-        /** Feeds a single reused entry to {@code consumer}: no per-entry allocation. */
+        /**
+         * Feeds a single reused entry to {@code consumer}: no per-entry allocation.
+         */
         @Override
         public void fastForEach(Consumer<? super Reference2ByteMap.Entry<K>> consumer) {
             Entry entry = new Entry();
             final var vals = Enum2ByteMap.this.vals;
-        final int length = vals.length;
-        for (int i = 0; i < length; i++) {
+            final int length = vals.length;
+            for (int i = 0; i < length; i++) {
                 if (vals[i] != (byte) 0) {
                     entry.index = i;
                     consumer.accept(entry);
@@ -352,8 +360,7 @@ public final class Enum2ByteMap<K extends Enum<K>> extends AbstractReference2Byt
 
         @Override
         public boolean contains(Object o) {
-            if (!(o instanceof Map.Entry)) return false;
-            var e = (Map.Entry<?, ?>) o;
+            if (!(o instanceof Map.Entry<?, ?> e)) return false;
             if (!isValidKey(e.getKey())) return false;
             int i = ((Enum<?>) e.getKey()).ordinal();
             return vals[i] != (byte) 0 && Byte.valueOf(vals[i]).equals(e.getValue());
@@ -367,7 +374,9 @@ public final class Enum2ByteMap<K extends Enum<K>> extends AbstractReference2Byt
         }
     }
 
-    /** A reused, index-backed entry; valid only while its iterator stands still. */
+    /**
+     * A reused, index-backed entry; valid only while its iterator stands still.
+     */
     private final class Entry implements Reference2ByteMap.Entry<K> {
 
         private int index = -1;
@@ -391,8 +400,7 @@ public final class Enum2ByteMap<K extends Enum<K>> extends AbstractReference2Byt
 
         @Override
         public boolean equals(Object o) {
-            if (!(o instanceof Map.Entry)) return false;
-            var e = (Map.Entry<?, ?>) o;
+            if (!(o instanceof Map.Entry<?, ?> e)) return false;
             return e.getKey() == keys[index] && Byte.valueOf(vals[index]).equals(e.getValue());
         }
 

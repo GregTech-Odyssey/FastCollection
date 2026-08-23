@@ -12,9 +12,13 @@ package com.gto.fastcollection.cache;
  */
 interface ChainNode<N extends ChainNode<N>> {
 
-    /** The successor of this node in its chain. */
+    /**
+     * The successor of this node in its chain.
+     */
     N getNext();
 
-    /** Relinks this node to {@code next}. */
+    /**
+     * Relinks this node to {@code next}.
+     */
     void setNext(N next);
 }

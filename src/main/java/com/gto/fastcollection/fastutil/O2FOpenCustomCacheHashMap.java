@@ -65,9 +65,9 @@ public final class O2FOpenCustomCacheHashMap<K> extends Object2FloatOpenCustomHa
         final int[] hash = this.hash;
         final int mask = this.mask;
         a:
-        for (;;) {
+        for (; ; ) {
             pos = ((last = pos) + 1) & mask;
-            for (;;) {
+            for (; ; ) {
                 if ((curr = key[pos]) == null) {
                     key[last] = null;
                     value[last] = 0f;
@@ -391,7 +391,9 @@ public final class O2FOpenCustomCacheHashMap<K> extends Object2FloatOpenCustomHa
         return value[pos] = newVal;
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public float mergeFloat(final K k, final float v, it.unimi.dsi.fastutil.floats.FloatBinaryOperator remappingFunction) {
         int pos, h = 0;
@@ -448,7 +450,8 @@ public final class O2FOpenCustomCacheHashMap<K> extends Object2FloatOpenCustomHa
             this.index = index;
         }
 
-        MapEntry() {}
+        MapEntry() {
+        }
 
         @Override
         public K getKey() {
@@ -537,7 +540,7 @@ public final class O2FOpenCustomCacheHashMap<K> extends Object2FloatOpenCustomHa
             final K[] key = O2FOpenCustomCacheHashMap.this.key;
             final int[] hash = O2FOpenCustomCacheHashMap.this.hash;
             final int mask = O2FOpenCustomCacheHashMap.this.mask;
-            for (;;) {
+            for (; ; ) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
                     final K k = wrapped.get(-pos - 1);
@@ -581,9 +584,9 @@ public final class O2FOpenCustomCacheHashMap<K> extends Object2FloatOpenCustomHa
             final float[] value = O2FOpenCustomCacheHashMap.this.value;
             final int[] hash = O2FOpenCustomCacheHashMap.this.hash;
             final int mask = O2FOpenCustomCacheHashMap.this.mask;
-            for (;;) {
+            for (; ; ) {
                 pos = ((last = pos) + 1) & mask;
-                for (;;) {
+                for (; ; ) {
                     if ((curr = key[pos]) == null) {
                         key[last] = null;
                         hash[last] = 0;
@@ -672,7 +675,8 @@ public final class O2FOpenCustomCacheHashMap<K> extends Object2FloatOpenCustomHa
         boolean mustReturnNull = O2FOpenCustomCacheHashMap.this.containsNullKey;
         boolean hasSplit = false;
 
-        MapSpliterator() {}
+        MapSpliterator() {
+        }
 
         MapSpliterator(int pos, int max, boolean mustReturnNull, boolean hasSplit) {
             this.pos = pos;
@@ -764,7 +768,8 @@ public final class O2FOpenCustomCacheHashMap<K> extends Object2FloatOpenCustomHa
 
         private static final int POST_SPLIT_CHARACTERISTICS = ObjectSpliterators.SET_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
 
-        EntrySpliterator() {}
+        EntrySpliterator() {
+        }
 
         EntrySpliterator(int pos, int max, boolean mustReturnNull, boolean hasSplit) {
             super(pos, max, mustReturnNull, hasSplit);
@@ -806,12 +811,12 @@ public final class O2FOpenCustomCacheHashMap<K> extends Object2FloatOpenCustomHa
         @Override
         @SuppressWarnings("unchecked")
         public boolean contains(final Object o) {
-            if (!(o instanceof Map.Entry)) return false;
-            final Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
+            if (!(o instanceof java.util.Map.Entry<?, ?> e)) return false;
             if (e.getValue() == null || !(e.getValue() instanceof Float)) return false;
             final K k = ((K) e.getKey());
             final float v = ((Float) (e.getValue())).floatValue();
-            if (((k) == null)) return O2FOpenCustomCacheHashMap.this.containsNullKey && (Float.floatToRawIntBits(value[n]) == Float.floatToRawIntBits(v));
+            if (((k) == null))
+                return O2FOpenCustomCacheHashMap.this.containsNullKey && (Float.floatToRawIntBits(value[n]) == Float.floatToRawIntBits(v));
             K curr;
             final K[] key = O2FOpenCustomCacheHashMap.this.key;
             final int mask = O2FOpenCustomCacheHashMap.this.mask;
@@ -820,15 +825,15 @@ public final class O2FOpenCustomCacheHashMap<K> extends Object2FloatOpenCustomHa
             if (strategy.equals(k, curr)) return (Float.floatToRawIntBits(value[pos]) == Float.floatToRawIntBits(v));
             while (true) {
                 if (((curr = key[pos = (pos + 1) & mask]) == null)) return false;
-                if (strategy.equals(k, curr)) return (Float.floatToRawIntBits(value[pos]) == Float.floatToRawIntBits(v));
+                if (strategy.equals(k, curr))
+                    return (Float.floatToRawIntBits(value[pos]) == Float.floatToRawIntBits(v));
             }
         }
 
         @Override
         @SuppressWarnings("unchecked")
         public boolean remove(final Object o) {
-            if (!(o instanceof Map.Entry)) return false;
-            final Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
+            if (!(o instanceof java.util.Map.Entry<?, ?> e)) return false;
             if (e.getValue() == null || !(e.getValue() instanceof Float)) return false;
             final K k = ((K) e.getKey());
             final float v = ((Float) (e.getValue())).floatValue();
@@ -876,10 +881,12 @@ public final class O2FOpenCustomCacheHashMap<K> extends Object2FloatOpenCustomHa
         public void forEach(final Consumer<? super Entry<K>> consumer) {
             if (containsNullKey) consumer.accept(new MapEntry(n));
             final K[] key = O2FOpenCustomCacheHashMap.this.key;
-            for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) consumer.accept(new MapEntry(pos));
+            for (int pos = n; pos-- != 0; ) if (!((key[pos]) == null)) consumer.accept(new MapEntry(pos));
         }
 
-        /** {@inheritDoc} */
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public void fastForEach(final Consumer<? super Entry<K>> consumer) {
             final MapEntry entry = new MapEntry();
@@ -888,10 +895,11 @@ public final class O2FOpenCustomCacheHashMap<K> extends Object2FloatOpenCustomHa
                 consumer.accept(entry);
             }
             final K[] key = O2FOpenCustomCacheHashMap.this.key;
-            for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) {
-                entry.index = pos;
-                consumer.accept(entry);
-            }
+            for (int pos = n; pos-- != 0; )
+                if (!((key[pos]) == null)) {
+                    entry.index = pos;
+                    consumer.accept(entry);
+                }
         }
     }
 
@@ -922,7 +930,8 @@ public final class O2FOpenCustomCacheHashMap<K> extends Object2FloatOpenCustomHa
 
         private static final int POST_SPLIT_CHARACTERISTICS = ObjectSpliterators.SET_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
 
-        KeySpliterator() {}
+        KeySpliterator() {
+        }
 
         KeySpliterator(int pos, int max, boolean mustReturnNull, boolean hasSplit) {
             super(pos, max, mustReturnNull, hasSplit);
@@ -956,12 +965,14 @@ public final class O2FOpenCustomCacheHashMap<K> extends Object2FloatOpenCustomHa
             return new KeySpliterator();
         }
 
-        /** {@inheritDoc} */
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public void forEach(final Consumer<? super K> consumer) {
             final K[] key = O2FOpenCustomCacheHashMap.this.key;
             if (containsNullKey) consumer.accept(key[n]);
-            for (int pos = n; pos-- != 0;) {
+            for (int pos = n; pos-- != 0; ) {
                 final K k = key[pos];
                 if (!((k) == null)) consumer.accept(k);
             }
@@ -1017,7 +1028,8 @@ public final class O2FOpenCustomCacheHashMap<K> extends Object2FloatOpenCustomHa
 
         private static final int POST_SPLIT_CHARACTERISTICS = FloatSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
 
-        ValueSpliterator() {}
+        ValueSpliterator() {
+        }
 
         ValueSpliterator(int pos, int max, boolean mustReturnNull, boolean hasSplit) {
             super(pos, max, mustReturnNull, hasSplit);
@@ -1059,7 +1071,7 @@ public final class O2FOpenCustomCacheHashMap<K> extends Object2FloatOpenCustomHa
                 final K[] key = O2FOpenCustomCacheHashMap.this.key;
                 final float[] value = O2FOpenCustomCacheHashMap.this.value;
                 if (containsNullKey) consumer.accept(value[n]);
-                for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) consumer.accept(value[pos]);
+                for (int pos = n; pos-- != 0; ) if (!((key[pos]) == null)) consumer.accept(value[pos]);
             }
 
             @Override
@@ -1090,9 +1102,10 @@ public final class O2FOpenCustomCacheHashMap<K> extends Object2FloatOpenCustomHa
         final float[] newValue = new float[newN + 1];
         final int[] newHash = new int[newN + 1];
         int i = n, pos, h;
-        for (int j = realSize(); j-- != 0;) {
-            while (((key[--i]) == null));
-            if (!((newKey[pos = HashCommon.mix(h = hash[i]) & mask]) == null)) while (!((newKey[pos = (pos + 1) & mask]) == null));
+        for (int j = realSize(); j-- != 0; ) {
+            while (((key[--i]) == null)) ;
+            if (!((newKey[pos = HashCommon.mix(h = hash[i]) & mask]) == null))
+                while (!((newKey[pos = (pos + 1) & mask]) == null)) ;
             newKey[pos] = key[i];
             newValue[pos] = value[i];
             newHash[pos] = h;
@@ -1119,7 +1132,7 @@ public final class O2FOpenCustomCacheHashMap<K> extends Object2FloatOpenCustomHa
         final K[] key = this.key;
         final float[] value = this.value;
         final int[] hash = this.hash;
-        for (int j = realSize(), i = 0, t = 0; j-- != 0;) {
+        for (int j = realSize(), i = 0, t = 0; j-- != 0; ) {
             while (((key[i]) == null)) i++;
             if (this != key[i]) t = hash[i];
             t ^= it.unimi.dsi.fastutil.HashCommon.float2int(value[i]);

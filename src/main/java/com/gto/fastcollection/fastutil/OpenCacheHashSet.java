@@ -116,7 +116,7 @@ public final class OpenCacheHashSet<K> extends ObjectOpenHashSet<K> {
             int pos;
             if ((curr = key[pos = HashCommon.mix(h) & mask]) != null) {
                 do {
-                    if ( hash[pos] == h && (curr == k || curr.equals(k))) return curr;
+                    if (hash[pos] == h && (curr == k || curr.equals(k))) return curr;
                 } while ((curr = key[pos = (pos + 1) & mask]) != null);
             }
             key[pos] = k;
@@ -133,9 +133,9 @@ public final class OpenCacheHashSet<K> extends ObjectOpenHashSet<K> {
         final K[] key = this.key;
         final int[] hash = this.hash;
         a:
-        for (;;) {
+        for (; ; ) {
             pos = ((last = pos) + 1) & mask;
-            for (;;) {
+            for (; ; ) {
                 if ((curr = key[pos]) == null) {
                     key[last] = null;
                     hash[last] = 0;
@@ -242,11 +242,11 @@ public final class OpenCacheHashSet<K> extends ObjectOpenHashSet<K> {
         final int[] newHash = new int[newN + 1];
         int i = n, pos, h;
         K k;
-        for (int j = realSize(); j-- != 0;) {
-            while ((k = key[--i]) == null);
+        for (int j = realSize(); j-- != 0; ) {
+            while ((k = key[--i]) == null) ;
             h = hash[i];
             pos = HashCommon.mix(h) & mask;
-            if (newKey[pos] != null) while ((newKey[pos = (pos + 1) & mask]) != null);
+            if (newKey[pos] != null) while ((newKey[pos = (pos + 1) & mask]) != null) ;
             newKey[pos] = k;
             newHash[pos] = h;
         }
@@ -269,7 +269,7 @@ public final class OpenCacheHashSet<K> extends ObjectOpenHashSet<K> {
         int h = 0;
         final K[] key = this.key;
         final int[] hash = this.hash;
-        for (int j = realSize(), i = 0; j-- != 0;) {
+        for (int j = realSize(), i = 0; j-- != 0; ) {
             while (key[i] == null) i++;
             if (this != key[i]) h += hash[i];
             i++;
@@ -299,7 +299,7 @@ public final class OpenCacheHashSet<K> extends ObjectOpenHashSet<K> {
                 last = n;
                 return key[n];
             }
-            for (;;) {
+            for (; ; ) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
                     return wrapped.get(-pos - 1);
@@ -313,9 +313,9 @@ public final class OpenCacheHashSet<K> extends ObjectOpenHashSet<K> {
             K curr;
             final K[] key = OpenCacheHashSet.this.key;
             final int[] hash = OpenCacheHashSet.this.hash;
-            for (;;) {
+            for (; ; ) {
                 pos = ((last = pos) + 1) & mask;
-                for (;;) {
+                for (; ; ) {
                     if ((curr = key[pos]) == null) {
                         key[last] = null;
                         hash[last] = 0;
@@ -383,7 +383,8 @@ public final class OpenCacheHashSet<K> extends ObjectOpenHashSet<K> {
         boolean mustReturnNull = OpenCacheHashSet.this.containsNull;
         boolean hasSplit = false;
 
-        SetSpliterator() {}
+        SetSpliterator() {
+        }
 
         SetSpliterator(int pos, int max, boolean mustReturnNull, boolean hasSplit) {
             this.pos = pos;

@@ -33,12 +33,16 @@ import java.util.function.Supplier;
  */
 public interface NestedMap<K1, K2, V> {
 
-    /** Creates a nested map backed by {@code map}, with inner maps from {@code factory}. */
+    /**
+     * Creates a nested map backed by {@code map}, with inner maps from {@code factory}.
+     */
     static <K1, K2, V> NestedMap<K1, K2, V> create(Map<K1, Map<K2, V>> map, Supplier<Map<K2, V>> factory) {
         return new NestedMapWrapper<>(map, factory);
     }
 
-    /** Creates a nested map backed by a {@link HashMap}, with inner maps from {@code factory}. */
+    /**
+     * Creates a nested map backed by a {@link HashMap}, with inner maps from {@code factory}.
+     */
     static <K1, K2, V> NestedMap<K1, K2, V> create(Supplier<Map<K2, V>> factory) {
         return new NestedMapWrapper<>(new HashMap<>(), factory);
     }
@@ -53,7 +57,9 @@ public interface NestedMap<K1, K2, V> {
         return new NestedMapWrapper<>(new Reference2ReferenceOpenHashMap<>(), factory);
     }
 
-    /** The backing map, for direct (unwrapped) iteration. */
+    /**
+     * The backing map, for direct (unwrapped) iteration.
+     */
     Map<K1, Map<K2, V>> getMap();
 
     /**
@@ -134,7 +140,9 @@ public interface NestedMap<K1, K2, V> {
      */
     Map<K2, V> remove(K1 k1);
 
-    /** The number of first-level keys, i.e. of non-empty inner maps. */
+    /**
+     * The number of first-level keys, i.e. of non-empty inner maps.
+     */
     int size();
 
     /**
@@ -153,10 +161,14 @@ public interface NestedMap<K1, K2, V> {
      */
     void forEach(TriConsumer<? super K1, ? super K2, ? super V> action);
 
-    /** Whether no first-level key has entries. */
+    /**
+     * Whether no first-level key has entries.
+     */
     boolean isEmpty();
 
-    /** Removes all keys and values. */
+    /**
+     * Removes all keys and values.
+     */
     void clear();
 
     /**
@@ -265,7 +277,7 @@ public interface NestedMap<K1, K2, V> {
 
         @Override
         public void forEach(TriConsumer<? super K1, ? super K2, ? super V> action) {
-            map.forEach((k1,vs)-> vs.forEach((k2, v)-> action.accept(k1, k2, v)));
+            map.forEach((k1, vs) -> vs.forEach((k2, v) -> action.accept(k1, k2, v)));
         }
 
         @Override
@@ -278,7 +290,9 @@ public interface NestedMap<K1, K2, V> {
             map.clear();
         }
 
-        /** The inner map of {@code k1}, created (and wired through) if absent. */
+        /**
+         * The inner map of {@code k1}, created (and wired through) if absent.
+         */
         private Map<K2, V> innerMapFor(K1 k1) {
             if (isRefMap) {
                 return ((Reference2ReferenceMap<K1, Map<K2, V>>) map).computeIfAbsent(k1, factory);

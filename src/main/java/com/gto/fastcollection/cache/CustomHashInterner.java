@@ -6,6 +6,7 @@ import it.unimi.dsi.fastutil.HashCommon;
 
 import java.util.Arrays;
 import java.util.concurrent.locks.StampedLock;
+import java.util.function.UnaryOperator;
 
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 
@@ -19,7 +20,9 @@ public final class CustomHashInterner<T> extends Segmented<CustomHashInterner.Se
 
     private final Hash.Strategy<? super T> strategy;
 
-    /** Creates an interner with default concurrency. */
+    /**
+     * Creates an interner with default concurrency.
+     */
     public CustomHashInterner(Hash.Strategy<? super T> strategy) {
         this(Concurrents.NCPU, strategy);
     }
@@ -34,15 +37,26 @@ public final class CustomHashInterner<T> extends Segmented<CustomHashInterner.Se
         this.strategy = strategy;
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public T intern(final T sample) {
         int hash = strategy.hashCode(sample);
         int mix = HashCommon.mix(hash);
-        return segmentFor(mix).intern(sample, hash, mix);
+        return segmentFor(mix).intern(sample, hash, mix, Interner.identityMappingFunction());
     }
 
-    /** {@inheritDoc} */
+    @Override
+    public T intern(T sample, UnaryOperator<T> mappingFunction) {
+        int hash = strategy.hashCode(sample);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).intern(sample, hash, mix, mappingFunction);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean isPresent(final T sample) {
         int hash = strategy.hashCode(sample);
@@ -50,7 +64,9 @@ public final class CustomHashInterner<T> extends Segmented<CustomHashInterner.Se
         return segmentFor(mix).contains(sample, hash, mix);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean addIfAbsent(final T sample) {
         int hash = strategy.hashCode(sample);
@@ -58,13 +74,17 @@ public final class CustomHashInterner<T> extends Segmented<CustomHashInterner.Se
         return segmentFor(mix).add(sample, hash, mix);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void clear() {
         clearSegments();
     }
 
-    /** A striped segment holding canonical instances; see {@link CustomHashCache.Segment}. */
+    /**
+     * A striped segment holding canonical instances; see {@link CustomHashCache.Segment}.
+     */
     final static class Segment<T> extends HashSegment<Node<T>> {
         private final Hash.Strategy<? super T> strategy;
 
@@ -88,8 +108,10 @@ public final class CustomHashInterner<T> extends Segmented<CustomHashInterner.Se
             return false;
         }
 
-        /** Lookup under the read lock; on a miss the canonical instance is stored under the write lock. */
-        private T intern(final T k, final int hash, int mix) {
+        /**
+         * Lookup under the read lock; on a miss the canonical instance is stored under the write lock.
+         */
+        private T intern(final T k, final int hash, int mix, UnaryOperator<T> mappingFunction) {
             long stamp = readLock();
             try {
                 Node<T> curr = table[mix & mask];
@@ -100,9 +122,10 @@ public final class CustomHashInterner<T> extends Segmented<CustomHashInterner.Se
                     }
                     curr = curr.next;
                 }
-            }finally {
+            } finally {
                 unlockRead(stamp);
             }
+            final T v = mappingFunction.apply(k);
             stamp = writeLock();
             try {
                 final int index = mix & mask;
@@ -110,22 +133,24 @@ public final class CustomHashInterner<T> extends Segmented<CustomHashInterner.Se
                 Node<T> curr = node;
                 while (curr != null) {
                     var key = curr.key;
-                    if (curr.hash == hash && (key == k || strategy.equals(k, key))) {
+                    if (curr.hash == hash && (key == v || strategy.equals(v, key))) {
                         return key;
                     }
                     curr = curr.next;
                 }
-                table[index] = new Node<>(k, hash, node);
+                table[index] = new Node<>(v, hash, node);
                 if (++size > maxFill) {
                     resize();
                 }
-                return k;
+                return v;
             } finally {
                 unlockWrite(stamp);
             }
         }
 
-        /** Read-only membership test; never inserts anything. */
+        /**
+         * Read-only membership test; never inserts anything.
+         */
         private boolean contains(final T k, final int hash, int mix) {
             long stamp = readLock();
             try {
@@ -143,7 +168,9 @@ public final class CustomHashInterner<T> extends Segmented<CustomHashInterner.Se
             }
         }
 
-        /** Inserts only if absent, returning whether a new canonical instance was stored. */
+        /**
+         * Inserts only if absent, returning whether a new canonical instance was stored.
+         */
         private boolean add(final T k, final int hash, int mix) {
             long stamp = writeLock();
             try {
@@ -167,7 +194,9 @@ public final class CustomHashInterner<T> extends Segmented<CustomHashInterner.Se
         }
     }
 
-    /** A single entry in a chain; immutable except for {@code next}. */
+    /**
+     * A single entry in a chain; immutable except for {@code next}.
+     */
     static final class Node<T> implements ChainNode<Node<T>> {
 
         private final T key;

@@ -53,21 +53,27 @@ public final class Enum2IntMap<K extends Enum<K>> extends AbstractReference2IntM
     private final ReferenceSet<K> keySet = new KeySet();
     private final IntCollection values = new Values();
 
-    /** Creates an empty map able to hold every constant of {@code keyType}. */
+    /**
+     * Creates an empty map able to hold every constant of {@code keyType}.
+     */
     public Enum2IntMap(Class<K> keyType) {
         this.keyType = keyType;
         this.keys = EnumKeys.universe(keyType);
         this.vals = new int[keys.length];
     }
 
-    /** Creates a copy of {@code map}. */
+    /**
+     * Creates a copy of {@code map}.
+     */
     public Enum2IntMap(Enum2IntMap<K> map) {
         this(map.keyType);
         System.arraycopy(map.vals, 0, vals, 0, vals.length);
         this.size = map.size;
     }
 
-    /** The enum type this map is indexed by. */
+    /**
+     * The enum type this map is indexed by.
+     */
     public Class<K> keyType() {
         return keyType;
     }
@@ -215,7 +221,7 @@ public final class Enum2IntMap<K extends Enum<K>> extends AbstractReference2IntM
         int i = key.ordinal();
         int v = vals[i];
         if (v != 0) return v;
-        int newValue = (int) mappingFunction.applyAsInt(key);
+        int newValue = mappingFunction.applyAsInt(key);
         if (newValue != 0) {
             vals[i] = newValue;
             size++;
@@ -283,7 +289,7 @@ public final class Enum2IntMap<K extends Enum<K>> extends AbstractReference2IntM
             size++;
             return defRetValue;
         }
-        int sum = (int) (old + incr);
+        int sum = old + incr;
         vals[i] = sum;
         if (sum == 0) size--;
         return old;
@@ -325,13 +331,15 @@ public final class Enum2IntMap<K extends Enum<K>> extends AbstractReference2IntM
             return new EntryIterator();
         }
 
-        /** Feeds a single reused entry to {@code consumer}: no per-entry allocation. */
+        /**
+         * Feeds a single reused entry to {@code consumer}: no per-entry allocation.
+         */
         @Override
         public void fastForEach(Consumer<? super Reference2IntMap.Entry<K>> consumer) {
             Entry entry = new Entry();
             final var vals = Enum2IntMap.this.vals;
-        final int length = vals.length;
-        for (int i = 0; i < length; i++) {
+            final int length = vals.length;
+            for (int i = 0; i < length; i++) {
                 if (vals[i] != 0) {
                     entry.index = i;
                     consumer.accept(entry);
@@ -351,8 +359,7 @@ public final class Enum2IntMap<K extends Enum<K>> extends AbstractReference2IntM
 
         @Override
         public boolean contains(Object o) {
-            if (!(o instanceof Map.Entry)) return false;
-            var e = (Map.Entry<?, ?>) o;
+            if (!(o instanceof Map.Entry<?, ?> e)) return false;
             if (!isValidKey(e.getKey())) return false;
             int i = ((Enum<?>) e.getKey()).ordinal();
             return vals[i] != 0 && Integer.valueOf(vals[i]).equals(e.getValue());
@@ -366,7 +373,9 @@ public final class Enum2IntMap<K extends Enum<K>> extends AbstractReference2IntM
         }
     }
 
-    /** A reused, index-backed entry; valid only while its iterator stands still. */
+    /**
+     * A reused, index-backed entry; valid only while its iterator stands still.
+     */
     private final class Entry implements Reference2IntMap.Entry<K> {
 
         private int index = -1;
@@ -390,8 +399,7 @@ public final class Enum2IntMap<K extends Enum<K>> extends AbstractReference2IntM
 
         @Override
         public boolean equals(Object o) {
-            if (!(o instanceof Map.Entry)) return false;
-            var e = (Map.Entry<?, ?>) o;
+            if (!(o instanceof Map.Entry<?, ?> e)) return false;
             return e.getKey() == keys[index] && Integer.valueOf(vals[index]).equals(e.getValue());
         }
 

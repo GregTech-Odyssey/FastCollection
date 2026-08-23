@@ -34,19 +34,25 @@ abstract class Segmented<SEG extends HashSegment<?>> {
         }
     }
 
-    /** The segment responsible for a key whose mixed hash is {@code mix}. */
+    /**
+     * The segment responsible for a key whose mixed hash is {@code mix}.
+     */
     protected final SEG segmentFor(int mix) {
         return segments[(mix >>> segmentShift) & segmentMask];
     }
 
-    /** Clears every segment. */
+    /**
+     * Clears every segment.
+     */
     protected final void clearSegments() {
         for (var segment : segments) {
             segment.clear();
         }
     }
 
-    /** Sweeps dead entries in every segment. */
+    /**
+     * Sweeps dead entries in every segment.
+     */
     protected final void sweepSegments() {
         for (var segment : segments) {
             segment.clearInvalid();

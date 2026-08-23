@@ -7,6 +7,7 @@ import it.unimi.dsi.fastutil.HashCommon;
 import java.util.Arrays;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 
@@ -25,24 +26,13 @@ import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 public final class CustomHashCache<K, V> extends Segmented<CustomHashCache.Segment<K, V>> implements MapCache<K, V> {
 
     private final Hash.Strategy<? super K> strategy;
-    private final Function<? super K, ? extends V> createFunction;
-
-    /** Creates a cache with default concurrency and no factory. */
-    public CustomHashCache(Hash.Strategy<? super K> strategy) {
-        this(strategy, Concurrents.NCPU, null);
-    }
 
     /**
      * Creates a cache with default concurrency and the given factory;
      * {@code null} is allowed and behaves like the no-factory constructor.
      */
-    public CustomHashCache(Hash.Strategy<? super K> strategy, Function<? super K, ? extends V> createFunction) {
-        this(strategy, Concurrents.NCPU, createFunction);
-    }
-
-    /** Creates a cache with the given concurrency level and no factory. */
-    public CustomHashCache(Hash.Strategy<? super K> strategy, int concurrencyLevel) {
-        this(strategy, concurrencyLevel, null);
+    public CustomHashCache(Hash.Strategy<? super K> strategy) {
+        this(strategy, Concurrents.NCPU);
     }
 
     /**
@@ -52,50 +42,42 @@ public final class CustomHashCache<K, V> extends Segmented<CustomHashCache.Segme
      *                         updating distinct segments; rounded up to a power of two
      * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
      */
-    public CustomHashCache(Hash.Strategy<? super K> strategy, int concurrencyLevel,
-                           Function<? super K, ? extends V> createFunction) {
+    public CustomHashCache(Hash.Strategy<? super K> strategy, int concurrencyLevel) {
         super(concurrencyLevel, i -> new Segment<>(strategy));
         this.strategy = strategy;
-        this.createFunction = createFunction;
     }
 
-    /** {@inheritDoc} The function runs under the segment's write lock; it must not recurse. */
     @Override
     public V getCache(final K k, Function<? super K, ? extends V> createFunction) {
         int hash = strategy.hashCode(k);
         int mix = HashCommon.mix(hash);
-        return segmentFor(mix).getCache(k, hash, mix, createFunction);
+        return segmentFor(mix).getCache(k, hash, mix, createFunction, Interner.identityMappingFunction());
     }
 
-    /** {@inheritDoc} */
     @Override
-    public Function<? super K, ? extends V> createFunction() {
-        return this.createFunction;
-    }
-
-    /** {@inheritDoc} Uses the constructor factory. */
-    @Override
-    public V getCache(final K k) {
+    public V getCache(K k, Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction) {
         int hash = strategy.hashCode(k);
         int mix = HashCommon.mix(hash);
-        return segmentFor(mix).getCache(k, hash, mix, createFunction);
+        return segmentFor(mix).getCache(k, hash, mix, createFunction, keyMappingFunction);
     }
 
-    /** {@inheritDoc} Runs the function outside all locks, so it may recurse. */
     @Override
     public V getCacheRecursive(final K k, Function<? super K, ? extends V> createFunction) {
         int hash = strategy.hashCode(k);
         int mix = HashCommon.mix(hash);
-        return segmentFor(mix).getCacheRecursive(k, hash, mix, createFunction);
+        return segmentFor(mix).getCache(k, hash, mix, createFunction, Interner.identityMappingFunction());
     }
 
-    /** {@inheritDoc} Uses the constructor factory. */
     @Override
-    public V getCacheRecursive(final K k) {
-        return getCacheRecursive(k, this.createFunction);
+    public V getCacheRecursive(final K k, Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction) {
+        int hash = strategy.hashCode(k);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).getCache(k, hash, mix, createFunction, keyMappingFunction);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public V getIfPresent(final K k) {
         int hash = strategy.hashCode(k);
@@ -103,7 +85,9 @@ public final class CustomHashCache<K, V> extends Segmented<CustomHashCache.Segme
         return segmentFor(mix).getIfAbsent(k, hash, mix);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public V putIfAbsent(final K k, final V v) {
         int hash = strategy.hashCode(k);
@@ -111,7 +95,9 @@ public final class CustomHashCache<K, V> extends Segmented<CustomHashCache.Segme
         return segmentFor(mix).put(k, v, hash, mix);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void clear() {
         clearSegments();
@@ -147,54 +133,13 @@ public final class CustomHashCache<K, V> extends Segmented<CustomHashCache.Segme
         }
 
         /**
-         * Locked variant: probes under the read lock, then computes the value
-         * with the function while holding the write lock, so the function runs
-         * exactly once per key; it must not call back into this cache.
-         */
-        private V getCache(final K k, final int hash, int mix,
-                           Function<? super K, ? extends V> createFunction) {
-            long stamp = readLock();
-            try {
-                Node<K, V> curr = table[mix & mask];
-                while (curr != null) {
-                    if (curr.hash == hash && (k == curr.key || strategy.equals(k, curr.key))) {
-                        return curr.value;
-                    }
-                    curr = curr.next;
-                }
-            } finally {
-                unlockRead(stamp);
-            }
-            stamp = writeLock();
-            try {
-                final int index = mix & mask;
-                final Node<K, V> node = table[index];
-                Node<K, V> curr = node;
-                while (curr != null) {
-                    if (curr.hash == hash && (k == curr.key || strategy.equals(k, curr.key))) {
-                        return curr.value;
-                    }
-                    curr = curr.next;
-                }
-                final var v = createFunction.apply(k);
-                table[index] = new Node<>(k, v, hash, node);
-                if (++size > maxFill) {
-                    resize();
-                }
-                return v;
-            } finally {
-                unlockWrite(stamp);
-            }
-        }
-
-        /**
          * Recursive variant: probes under the read lock, runs the function with
          * every lock released so it may call back into this cache, and finally
          * stores the result under the write lock, keeping the value computed by
          * another thread if one landed first.
          */
-        private V getCacheRecursive(final K k, final int hash, int mix,
-                                    Function<? super K, ? extends V> createFunction) {
+        private V getCache(final K k, final int hash, int mix,
+                           Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction) {
             long stamp = readLock();
             try {
                 Node<K, V> curr = table[mix & mask];
@@ -209,18 +154,19 @@ public final class CustomHashCache<K, V> extends Segmented<CustomHashCache.Segme
             }
             // Run outside all locks so the function may call back into this cache.
             final var v = createFunction.apply(k);
+            final var k1 = keyMappingFunction.apply(k);
             stamp = writeLock();
             try {
                 final int index = mix & mask;
                 final Node<K, V> node = table[index];
                 Node<K, V> curr = table[index];
                 while (curr != null) {
-                    if (curr.hash == hash && (k == curr.key || strategy.equals(k, curr.key))) {
+                    if (curr.hash == hash && (k1 == curr.key || strategy.equals(k1, curr.key))) {
                         return curr.value;
                     }
                     curr = curr.next;
                 }
-                table[index] = new Node<>(k, v, hash, node);
+                table[index] = new Node<>(k1, v, hash, node);
                 if (++size > maxFill) {
                     resize();
                 }
@@ -230,7 +176,9 @@ public final class CustomHashCache<K, V> extends Segmented<CustomHashCache.Segme
             }
         }
 
-        /** Read-only lookup; never stores anything. */
+        /**
+         * Read-only lookup; never stores anything.
+         */
         private V getIfAbsent(final K k, final int hash, int mix) {
             long stamp = readLock();
             try {
@@ -248,9 +196,11 @@ public final class CustomHashCache<K, V> extends Segmented<CustomHashCache.Segme
             }
         }
 
-        /** Inserts only if absent, returning the value now bound to the key. */
+        /**
+         * Inserts only if absent, returning the value now bound to the key.
+         */
         private V put(final K k, final V v, final int hash, int mix) {
-           long stamp = writeLock();
+            long stamp = writeLock();
             try {
                 final int index = mix & mask;
                 final Node<K, V> node = table[index];
@@ -272,7 +222,9 @@ public final class CustomHashCache<K, V> extends Segmented<CustomHashCache.Segme
         }
     }
 
-    /** A single entry in a chain; immutable except for {@code next}. */
+    /**
+     * A single entry in a chain; immutable except for {@code next}.
+     */
     static final class Node<K, V> implements ChainNode<Node<K, V>> {
 
         private final K key;

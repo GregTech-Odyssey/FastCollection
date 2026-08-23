@@ -8,6 +8,8 @@ package com.gto.fastcollection.cache;
  */
 public interface ICleanableCache {
 
-    /** Removes all entries whose referents have already been garbage collected. */
+    /**
+     * Removes all entries whose referents have already been garbage collected.
+     */
     void clearCache();
 }

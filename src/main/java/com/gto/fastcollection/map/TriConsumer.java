@@ -11,6 +11,8 @@ package com.gto.fastcollection.map;
 @FunctionalInterface
 public interface TriConsumer<A, B, C> {
 
-    /** Performs the operation on the given arguments. */
+    /**
+     * Performs the operation on the given arguments.
+     */
     void accept(A a, B b, C c);
 }

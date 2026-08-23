@@ -54,21 +54,27 @@ public final class Enum2ShortMap<K extends Enum<K>> extends AbstractReference2Sh
     private final ReferenceSet<K> keySet = new KeySet();
     private final ShortCollection values = new Values();
 
-    /** Creates an empty map able to hold every constant of {@code keyType}. */
+    /**
+     * Creates an empty map able to hold every constant of {@code keyType}.
+     */
     public Enum2ShortMap(Class<K> keyType) {
         this.keyType = keyType;
         this.keys = EnumKeys.universe(keyType);
         this.vals = new short[keys.length];
     }
 
-    /** Creates a copy of {@code map}. */
+    /**
+     * Creates a copy of {@code map}.
+     */
     public Enum2ShortMap(Enum2ShortMap<K> map) {
         this(map.keyType);
         System.arraycopy(map.vals, 0, vals, 0, vals.length);
         this.size = map.size;
     }
 
-    /** The enum type this map is indexed by. */
+    /**
+     * The enum type this map is indexed by.
+     */
     public Class<K> keyType() {
         return keyType;
     }
@@ -326,13 +332,15 @@ public final class Enum2ShortMap<K extends Enum<K>> extends AbstractReference2Sh
             return new EntryIterator();
         }
 
-        /** Feeds a single reused entry to {@code consumer}: no per-entry allocation. */
+        /**
+         * Feeds a single reused entry to {@code consumer}: no per-entry allocation.
+         */
         @Override
         public void fastForEach(Consumer<? super Reference2ShortMap.Entry<K>> consumer) {
             Entry entry = new Entry();
             final var vals = Enum2ShortMap.this.vals;
-        final int length = vals.length;
-        for (int i = 0; i < length; i++) {
+            final int length = vals.length;
+            for (int i = 0; i < length; i++) {
                 if (vals[i] != (short) 0) {
                     entry.index = i;
                     consumer.accept(entry);
@@ -352,8 +360,7 @@ public final class Enum2ShortMap<K extends Enum<K>> extends AbstractReference2Sh
 
         @Override
         public boolean contains(Object o) {
-            if (!(o instanceof Map.Entry)) return false;
-            var e = (Map.Entry<?, ?>) o;
+            if (!(o instanceof Map.Entry<?, ?> e)) return false;
             if (!isValidKey(e.getKey())) return false;
             int i = ((Enum<?>) e.getKey()).ordinal();
             return vals[i] != (short) 0 && Short.valueOf(vals[i]).equals(e.getValue());
@@ -367,7 +374,9 @@ public final class Enum2ShortMap<K extends Enum<K>> extends AbstractReference2Sh
         }
     }
 
-    /** A reused, index-backed entry; valid only while its iterator stands still. */
+    /**
+     * A reused, index-backed entry; valid only while its iterator stands still.
+     */
     private final class Entry implements Reference2ShortMap.Entry<K> {
 
         private int index = -1;
@@ -391,8 +400,7 @@ public final class Enum2ShortMap<K extends Enum<K>> extends AbstractReference2Sh
 
         @Override
         public boolean equals(Object o) {
-            if (!(o instanceof Map.Entry)) return false;
-            var e = (Map.Entry<?, ?>) o;
+            if (!(o instanceof Map.Entry<?, ?> e)) return false;
             return e.getKey() == keys[index] && Short.valueOf(vals[index]).equals(e.getValue());
         }
 

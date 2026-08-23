@@ -6,6 +6,7 @@ import it.unimi.dsi.fastutil.HashCommon;
 
 import java.util.Arrays;
 import java.util.concurrent.locks.StampedLock;
+import java.util.function.UnaryOperator;
 
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 
@@ -21,7 +22,9 @@ public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInt
 
     private final Hash.Strategy<? super T> strategy;
 
-    /** Creates an interner with default concurrency. */
+    /**
+     * Creates an interner with default concurrency.
+     */
     public WeakCustomHashInterner(Hash.Strategy<? super T> strategy) {
         this(Concurrents.NCPU, strategy);
     }
@@ -38,15 +41,26 @@ public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInt
         CacheCleaner.add(this);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public T intern(final T sample) {
         int hash = strategy.hashCode(sample);
         int mix = HashCommon.mix(hash);
-        return segmentFor(mix).intern(sample, hash, mix);
+        return segmentFor(mix).intern(sample, hash, mix, Interner.identityMappingFunction());
     }
 
-    /** {@inheritDoc} */
+    @Override
+    public T intern(T sample, UnaryOperator<T> mappingFunction) {
+        int hash = strategy.hashCode(sample);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).intern(sample, hash, mix, mappingFunction);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean isPresent(final T sample) {
         int hash = strategy.hashCode(sample);
@@ -54,7 +68,9 @@ public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInt
         return segmentFor(mix).contains(sample, hash, mix);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean addIfAbsent(final T sample) {
         int hash = strategy.hashCode(sample);
@@ -62,13 +78,17 @@ public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInt
         return segmentFor(mix).add(sample, hash, mix);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void clear() {
         clearSegments();
     }
 
-    /** {@inheritDoc} Drops every entry whose instance has been collected. */
+    /**
+     * {@inheritDoc} Drops every entry whose instance has been collected.
+     */
     @Override
     public void clearCache() {
         sweepSegments();
@@ -104,8 +124,10 @@ public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInt
             return node.get() == null;
         }
 
-        /** Lookup under the read lock; on a miss the canonical instance is stored under the write lock. */
-        private T intern(final T k, final int hash, int mix) {
+        /**
+         * Lookup under the read lock; on a miss the canonical instance is stored under the write lock.
+         */
+        private T intern(final T k, final int hash, int mix, UnaryOperator<T> mappingFunction) {
             long stamp = readLock();
             try {
                 WeakReferenceNode<T> curr = table[mix & mask];
@@ -116,9 +138,10 @@ public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInt
                     }
                     curr = curr.next;
                 }
-            }finally {
+            } finally {
                 unlockRead(stamp);
             }
+            final T v = mappingFunction.apply(k);
             stamp = writeLock();
             try {
                 final int index = mix & mask;
@@ -136,24 +159,26 @@ public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInt
                         }
                         size--;
                     } else {
-                        if (curr.hash == hash && (key == k || strategy.equals(k, key))) {
+                        if (curr.hash == hash && (key == v || strategy.equals(v, key))) {
                             return key;
                         }
                         prev = curr;
                     }
                     curr = curr.next;
                 }
-                table[index] = new WeakReferenceNode<>(k, hash, node);
+                table[index] = new WeakReferenceNode<>(v, hash, node);
                 if (++size > maxFill) {
                     resize();
                 }
-                return k;
+                return v;
             } finally {
                 unlockWrite(stamp);
             }
         }
 
-        /** Read-only membership test; never mutates the chain. */
+        /**
+         * Read-only membership test; never mutates the chain.
+         */
         private boolean contains(final T k, final int hash, int mix) {
             long stamp = readLock();
             try {
@@ -174,7 +199,9 @@ public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInt
             }
         }
 
-        /** Inserts only if absent, returning whether a new canonical instance was stored. */
+        /**
+         * Inserts only if absent, returning whether a new canonical instance was stored.
+         */
         private boolean add(final T k, final int hash, int mix) {
             long stamp = writeLock();
             try {

@@ -37,10 +37,14 @@ abstract class HashSegment<N extends ChainNode<N>> extends StampedLock {
         this.maxFill = (int) (n * Hash.DEFAULT_LOAD_FACTOR);
     }
 
-    /** The stable hash a node was stored under. */
+    /**
+     * The stable hash a node was stored under.
+     */
     protected abstract int nodeHash(N node);
 
-    /** Whether the node's referent has been collected; always false for strong nodes. */
+    /**
+     * Whether the node's referent has been collected; always false for strong nodes.
+     */
     protected abstract boolean isDead(N node);
 
     /**
@@ -102,7 +106,9 @@ abstract class HashSegment<N extends ChainNode<N>> extends StampedLock {
         this.maxFill = (int) (newCap * Hash.DEFAULT_LOAD_FACTOR);
     }
 
-    /** Empties the table under the write lock. */
+    /**
+     * Empties the table under the write lock.
+     */
     protected final void clear() {
         long stamp = writeLock();
         try {
@@ -114,7 +120,9 @@ abstract class HashSegment<N extends ChainNode<N>> extends StampedLock {
         }
     }
 
-    /** Sweeps every dead node under the write lock; readers never mutate the chain. */
+    /**
+     * Sweeps every dead node under the write lock; readers never mutate the chain.
+     */
     protected final void clearInvalid() {
         long stamp = writeLock();
         try {

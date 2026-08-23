@@ -66,9 +66,9 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         final int[] hash = this.hash;
         final int mask = this.mask;
         a:
-        for (;;) {
+        for (; ; ) {
             pos = ((last = pos) + 1) & mask;
-            for (;;) {
+            for (; ; ) {
                 if ((curr = key[pos]) == null) {
                     key[last] = null;
                     value[last] = 0;
@@ -387,7 +387,9 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         return value[pos] = newVal;
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public long mergeLong(final K k, final long v, java.util.function.LongBinaryOperator remappingFunction) {
         int pos, h = 0;
@@ -444,7 +446,8 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
             this.index = index;
         }
 
-        MapEntry() {}
+        MapEntry() {
+        }
 
         @Override
         public K getKey() {
@@ -533,7 +536,7 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
             final K[] key = O2LOpenCacheHashMap.this.key;
             final int[] hash = O2LOpenCacheHashMap.this.hash;
             final int mask = O2LOpenCacheHashMap.this.mask;
-            for (;;) {
+            for (; ; ) {
                 if (--pos < 0) {
                     last = Integer.MIN_VALUE;
                     final K k = wrapped.get(-pos - 1);
@@ -577,9 +580,9 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
             final long[] value = O2LOpenCacheHashMap.this.value;
             final int[] hash = O2LOpenCacheHashMap.this.hash;
             final int mask = O2LOpenCacheHashMap.this.mask;
-            for (;;) {
+            for (; ; ) {
                 pos = ((last = pos) + 1) & mask;
-                for (;;) {
+                for (; ; ) {
                     if ((curr = key[pos]) == null) {
                         key[last] = null;
                         hash[last] = 0;
@@ -668,7 +671,8 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         boolean mustReturnNull = O2LOpenCacheHashMap.this.containsNullKey;
         boolean hasSplit = false;
 
-        MapSpliterator() {}
+        MapSpliterator() {
+        }
 
         MapSpliterator(int pos, int max, boolean mustReturnNull, boolean hasSplit) {
             this.pos = pos;
@@ -760,7 +764,8 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
 
         private static final int POST_SPLIT_CHARACTERISTICS = ObjectSpliterators.SET_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
 
-        EntrySpliterator() {}
+        EntrySpliterator() {
+        }
 
         EntrySpliterator(int pos, int max, boolean mustReturnNull, boolean hasSplit) {
             super(pos, max, mustReturnNull, hasSplit);
@@ -802,8 +807,7 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         @Override
         @SuppressWarnings("unchecked")
         public boolean contains(final Object o) {
-            if (!(o instanceof Map.Entry)) return false;
-            final Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
+            if (!(o instanceof java.util.Map.Entry<?, ?> e)) return false;
             if (e.getValue() == null || !(e.getValue() instanceof Long)) return false;
             final K k = ((K) e.getKey());
             final long v = (Long) (e.getValue());
@@ -823,8 +827,7 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         @Override
         @SuppressWarnings("unchecked")
         public boolean remove(final Object o) {
-            if (!(o instanceof Map.Entry)) return false;
-            final Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
+            if (!(o instanceof java.util.Map.Entry<?, ?> e)) return false;
             if (e.getValue() == null || !(e.getValue() instanceof Long)) return false;
             final K k = ((K) e.getKey());
             final long v = (Long) (e.getValue());
@@ -872,10 +875,12 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         public void forEach(final Consumer<? super Entry<K>> consumer) {
             if (containsNullKey) consumer.accept(new MapEntry(n));
             final K[] key = O2LOpenCacheHashMap.this.key;
-            for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) consumer.accept(new MapEntry(pos));
+            for (int pos = n; pos-- != 0; ) if (!((key[pos]) == null)) consumer.accept(new MapEntry(pos));
         }
 
-        /** {@inheritDoc} */
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public void fastForEach(final Consumer<? super Entry<K>> consumer) {
             final MapEntry entry = new MapEntry();
@@ -884,10 +889,11 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
                 consumer.accept(entry);
             }
             final K[] key = O2LOpenCacheHashMap.this.key;
-            for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) {
-                entry.index = pos;
-                consumer.accept(entry);
-            }
+            for (int pos = n; pos-- != 0; )
+                if (!((key[pos]) == null)) {
+                    entry.index = pos;
+                    consumer.accept(entry);
+                }
         }
     }
 
@@ -918,7 +924,8 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
 
         private static final int POST_SPLIT_CHARACTERISTICS = ObjectSpliterators.SET_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
 
-        KeySpliterator() {}
+        KeySpliterator() {
+        }
 
         KeySpliterator(int pos, int max, boolean mustReturnNull, boolean hasSplit) {
             super(pos, max, mustReturnNull, hasSplit);
@@ -952,12 +959,14 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
             return new KeySpliterator();
         }
 
-        /** {@inheritDoc} */
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public void forEach(final Consumer<? super K> consumer) {
             final K[] key = O2LOpenCacheHashMap.this.key;
             if (containsNullKey) consumer.accept(key[n]);
-            for (int pos = n; pos-- != 0;) {
+            for (int pos = n; pos-- != 0; ) {
                 final K k = key[pos];
                 if (!((k) == null)) consumer.accept(k);
             }
@@ -1013,7 +1022,8 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
 
         private static final int POST_SPLIT_CHARACTERISTICS = LongSpliterators.COLLECTION_SPLITERATOR_CHARACTERISTICS & ~java.util.Spliterator.SIZED;
 
-        ValueSpliterator() {}
+        ValueSpliterator() {
+        }
 
         ValueSpliterator(int pos, int max, boolean mustReturnNull, boolean hasSplit) {
             super(pos, max, mustReturnNull, hasSplit);
@@ -1055,7 +1065,7 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
                 final K[] key = O2LOpenCacheHashMap.this.key;
                 final long[] value = O2LOpenCacheHashMap.this.value;
                 if (containsNullKey) consumer.accept(value[n]);
-                for (int pos = n; pos-- != 0;) if (!((key[pos]) == null)) consumer.accept(value[pos]);
+                for (int pos = n; pos-- != 0; ) if (!((key[pos]) == null)) consumer.accept(value[pos]);
             }
 
             @Override
@@ -1086,9 +1096,10 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         final long[] newValue = new long[newN + 1];
         final int[] newHash = new int[newN + 1];
         int i = n, pos, h;
-        for (int j = realSize(); j-- != 0;) {
-            while (((key[--i]) == null));
-            if (!((newKey[pos = HashCommon.mix(h = hash[i]) & mask]) == null)) while (!((newKey[pos = (pos + 1) & mask]) == null));
+        for (int j = realSize(); j-- != 0; ) {
+            while (((key[--i]) == null)) ;
+            if (!((newKey[pos = HashCommon.mix(h = hash[i]) & mask]) == null))
+                while (!((newKey[pos = (pos + 1) & mask]) == null)) ;
             newKey[pos] = key[i];
             newValue[pos] = value[i];
             newHash[pos] = h;
@@ -1115,7 +1126,7 @@ public final class O2LOpenCacheHashMap<K> extends Object2LongOpenHashMap<K> {
         final K[] key = this.key;
         final long[] value = this.value;
         final int[] hash = this.hash;
-        for (int j = realSize(), i = 0, t = 0; j-- != 0;) {
+        for (int j = realSize(), i = 0, t = 0; j-- != 0; ) {
             while (((key[i]) == null)) i++;
             if (this != key[i]) t = hash[i];
             t ^= HashCommon.long2int(value[i]);
