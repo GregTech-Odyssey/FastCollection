@@ -158,8 +158,8 @@ public final class WeakValueHashCache<K, V> extends Segmented<WeakValueHashCache
                 unlockRead(stamp);
             }
             // Run outside all locks so the function may call back into this cache.
-            final var v = createFunction.apply(k);
-            final var k1 = keyMappingFunction.apply(k);
+            final var mapped = keyMappingFunction.apply(k);
+            final var v = createFunction.apply(mapped);
             stamp = writeLock();
             try {
                 final int index = mix & mask;
@@ -167,13 +167,13 @@ public final class WeakValueHashCache<K, V> extends Segmented<WeakValueHashCache
                 WeakReferenceValueNode<K, V> prev = null;
                 WeakReferenceValueNode<K, V> curr = node;
                 while (curr != null) {
-                    if (curr.hash == hash && (curr.key == k1 || k1.equals(curr.key))) {
+                    if (curr.hash == hash && (curr.key == mapped || mapped.equals(curr.key))) {
                         V existing = curr.get();
                         if (existing != null) {
                             return existing;
                         }
                         // value was collected: replace the dead node with the computed value
-                        var n = new WeakReferenceValueNode<>(k1, v, hash, curr.next);
+                        var n = new WeakReferenceValueNode<>(mapped, v, hash, curr.next);
                         if (prev == null) {
                             table[index] = n;
                         } else {
@@ -184,7 +184,7 @@ public final class WeakValueHashCache<K, V> extends Segmented<WeakValueHashCache
                     prev = curr;
                     curr = curr.next;
                 }
-                table[index] = new WeakReferenceValueNode<>(k1, v, hash, node);
+                table[index] = new WeakReferenceValueNode<>(mapped, v, hash, node);
                 if (++size > maxFill) {
                     resize();
                 }

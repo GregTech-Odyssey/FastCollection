@@ -58,8 +58,8 @@ public final class HashCache<K, V> implements MapCache<K, V> {
         if (v != null) {
             return v;
         }
-        v = createFunction.apply(k);
         K mapped = keyMappingFunction.apply(k);
+        v = createFunction.apply(mapped);
         V prev = map.putIfAbsent(mapped, v);
         return prev == null ? v : prev;
     }
@@ -95,8 +95,8 @@ public final class HashCache<K, V> implements MapCache<K, V> {
         if (v != null) {
             return v;
         }
-        v = createFunction.apply(k);
         K mapped = keyMappingFunction.apply(k);
+        v = createFunction.apply(mapped);
         V prev = map.putIfAbsent(mapped, v);
         return prev == null ? v : prev;
     }

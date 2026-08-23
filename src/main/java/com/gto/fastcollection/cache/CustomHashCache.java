@@ -153,20 +153,20 @@ public final class CustomHashCache<K, V> extends Segmented<CustomHashCache.Segme
                 unlockRead(stamp);
             }
             // Run outside all locks so the function may call back into this cache.
-            final var v = createFunction.apply(k);
-            final var k1 = keyMappingFunction.apply(k);
+            final var mapped = keyMappingFunction.apply(k);
+            final var v = createFunction.apply(mapped);
             stamp = writeLock();
             try {
                 final int index = mix & mask;
                 final Node<K, V> node = table[index];
                 Node<K, V> curr = table[index];
                 while (curr != null) {
-                    if (curr.hash == hash && (k1 == curr.key || strategy.equals(k1, curr.key))) {
+                    if (curr.hash == hash && (mapped == curr.key || strategy.equals(mapped, curr.key))) {
                         return curr.value;
                     }
                     curr = curr.next;
                 }
-                table[index] = new Node<>(k1, v, hash, node);
+                table[index] = new Node<>(mapped, v, hash, node);
                 if (++size > maxFill) {
                     resize();
                 }

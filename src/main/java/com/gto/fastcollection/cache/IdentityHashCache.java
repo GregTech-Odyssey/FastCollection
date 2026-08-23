@@ -146,19 +146,19 @@ public final class IdentityHashCache<K, V> extends Segmented<IdentityHashCache.S
                 unlockRead(stamp);
             }
             // Run outside all locks so the function may call back into this cache.
-            final var v = createFunction.apply(k);
-            final var k1 = keyMappingFunction.apply(k);
+            final var mapped = keyMappingFunction.apply(k);
+            final var v = createFunction.apply(mapped);
             stamp = writeLock();
             try {
                 final int index = mix & mask;
                 Node<K, V> curr = table[index];
                 while (curr != null) {
-                    if (curr.key == k1) {
+                    if (curr.key == mapped) {
                         return curr.value;
                     }
                     curr = curr.next;
                 }
-                table[index] = new Node<>(k1, v, table[index]);
+                table[index] = new Node<>(mapped, v, table[index]);
                 if (++size > maxFill) {
                     resize();
                 }

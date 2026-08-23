@@ -159,8 +159,8 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
                 unlockRead(stamp);
             }
             // Run outside all locks so the function may call back into this cache.
-            final var v = createFunction.apply(k);
-            final var k1 = keyMappingFunction.apply(k);
+            final var mapped = keyMappingFunction.apply(k);
+            final var v = createFunction.apply(mapped);
             stamp = writeLock();
             try {
                 final int index = mix & mask;
@@ -168,13 +168,13 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
                 Node<K, V> prev = null;
                 Node<K, V> curr = node;
                 while (curr != null) {
-                    if (curr.key == k1) {
+                    if (curr.key == mapped) {
                         V existing = curr.get();
                         if (existing != null) {
                             return existing;
                         }
                         // value was collected: replace the dead node with the computed value
-                        var n = new Node<>(k1, v, curr.next);
+                        var n = new Node<>(mapped, v, curr.next);
                         if (prev == null) {
                             table[index] = n;
                         } else {
@@ -185,7 +185,7 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
                     prev = curr;
                     curr = curr.next;
                 }
-                table[index] = new Node<>(k1, v, node);
+                table[index] = new Node<>(mapped, v, node);
                 if (++size > maxFill) {
                     resize();
                 }
