@@ -306,6 +306,76 @@ public final class Enum2IntMap<K extends Enum<K>> extends AbstractReference2IntM
         return newValue;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Walks the value array directly (no entry-set allocation). Same-type
+     * peers with the same key universe compare by array equality.
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) return true;
+        if (!(o instanceof Map<?, ?> m)) return false;
+        if (m.size() != size) return false;
+        if (o instanceof Enum2IntMap<?> other && other.keyType == keyType) {
+            return Arrays.equals(vals, other.vals);
+        }
+        final var vals = this.vals;
+        final var keys = this.keys;
+        for (int i = 0, n = vals.length; i < n; i++) {
+            int v = vals[i];
+            if (v != 0) {
+                Object ov = m.get(keys[i]);
+                if (!(ov instanceof Integer iv) || iv.intValue() != v) return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Sum of entry hashes over present slots; matches {@link Map} and the
+     * reused entry's {@code hashCode}.
+     */
+    @Override
+    public int hashCode() {
+        int h = 0;
+        final var vals = this.vals;
+        final var keys = this.keys;
+        for (int i = 0, n = vals.length; i < n; i++) {
+            int v = vals[i];
+            if (v != 0) h += keys[i].hashCode() ^ v;
+        }
+        return h;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Same-type peers with the same key universe merge by a single array
+     * pass (no boxing, no entry iteration).
+     */
+    @Override
+    public void putAll(Map<? extends K, ? extends Integer> m) {
+        if (m instanceof Enum2IntMap<?> other && other.keyType == keyType) {
+            if (other.size == 0) return;
+            final int[] src = other.vals;
+            final int[] dst = this.vals;
+            int sz = this.size;
+            for (int i = 0, n = dst.length; i < n; i++) {
+                int v = src[i];
+                if (v != 0) {
+                    if (dst[i] == 0) sz++;
+                    dst[i] = v;
+                }
+            }
+            this.size = sz;
+            return;
+        }
+        super.putAll(m);
+    }
+
     private boolean isValidKey(Object key) {
         if (key == null) return false;
         Class<?> keyClass = key.getClass();
@@ -356,7 +426,8 @@ public final class Enum2IntMap<K extends Enum<K>> extends AbstractReference2IntM
             if (!(o instanceof Map.Entry<?, ?> e)) return false;
             if (!isValidKey(e.getKey())) return false;
             int i = ((Enum<?>) e.getKey()).ordinal();
-            return vals[i] != 0 && Integer.valueOf(vals[i]).equals(e.getValue());
+            Object ov = e.getValue();
+            return vals[i] != 0 && ov instanceof Integer iv && iv.intValue() == vals[i];
         }
 
         @Override
@@ -387,24 +458,30 @@ public final class Enum2IntMap<K extends Enum<K>> extends AbstractReference2IntM
         @Override
         public int setValue(int value) {
             int old = vals[index];
-            put(keys[index], value);
+            vals[index] = value;
+            if (value == 0) {
+                if (old != 0) size--;
+            } else if (old == 0) {
+                size++;
+            }
             return old;
         }
 
         @Override
         public boolean equals(Object o) {
             if (!(o instanceof Map.Entry<?, ?> e)) return false;
-            return e.getKey() == keys[index] && Integer.valueOf(vals[index]).equals(e.getValue());
+            Object ov = e.getValue();
+            return e.getKey() == keys[index] && ov instanceof Integer iv && iv.intValue() == vals[index];
         }
 
         @Override
         public int hashCode() {
-            return keys[index].hashCode() ^ Integer.valueOf(vals[index]).hashCode();
+            return keys[index].hashCode() ^ vals[index];
         }
 
         @Override
         public String toString() {
-            return keys[index] + "=" + Integer.valueOf(vals[index]);
+            return keys[index] + "=" + vals[index];
         }
     }
 
@@ -429,7 +506,10 @@ public final class Enum2IntMap<K extends Enum<K>> extends AbstractReference2IntM
 
         public void remove() {
             if (current < 0) throw new IllegalStateException();
-            Enum2IntMap.this.put(keys[current], 0);
+            if (vals[current] != 0) {
+                vals[current] = 0;
+                size--;
+            }
             current = -1;
         }
     }

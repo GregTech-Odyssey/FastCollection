@@ -124,10 +124,11 @@ public final class Enum2DoubleMap<K extends Enum<K>> extends AbstractReference2D
     @Override
     public boolean containsValue(double value) {
         if (value == 0D) return false;
+        final long bits = Double.doubleToLongBits(value);
         final var vals = Enum2DoubleMap.this.vals;
         final int length = vals.length;
         for (int i = 0; i < length; i++) {
-            if (vals[i] == value) return true;
+            if (Double.doubleToLongBits(vals[i]) == bits) return true;
         }
         return false;
     }
@@ -306,6 +307,77 @@ public final class Enum2DoubleMap<K extends Enum<K>> extends AbstractReference2D
         return newValue;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Walks the value array directly (no entry-set allocation). Same-type
+     * peers with the same key universe compare by array equality
+     * ({@link Arrays#equals(double[], double[])}, bit-exact).
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) return true;
+        if (!(o instanceof Map<?, ?> m)) return false;
+        if (m.size() != size) return false;
+        if (o instanceof Enum2DoubleMap<?> other && other.keyType == keyType) {
+            return Arrays.equals(vals, other.vals);
+        }
+        final var vals = this.vals;
+        final var keys = this.keys;
+        for (int i = 0, n = vals.length; i < n; i++) {
+            double v = vals[i];
+            if (v != 0D) {
+                Object ov = m.get(keys[i]);
+                if (!(ov instanceof Double dv) || Double.doubleToLongBits(dv.doubleValue()) != Double.doubleToLongBits(v)) return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Sum of entry hashes over present slots; matches {@link Map} and the
+     * reused entry's {@code hashCode}.
+     */
+    @Override
+    public int hashCode() {
+        int h = 0;
+        final var vals = this.vals;
+        final var keys = this.keys;
+        for (int i = 0, n = vals.length; i < n; i++) {
+            double v = vals[i];
+            if (v != 0D) h += keys[i].hashCode() ^ Double.hashCode(v);
+        }
+        return h;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Same-type peers with the same key universe merge by a single array
+     * pass (no boxing, no entry iteration).
+     */
+    @Override
+    public void putAll(Map<? extends K, ? extends Double> m) {
+        if (m instanceof Enum2DoubleMap<?> other && other.keyType == keyType) {
+            if (other.size == 0) return;
+            final double[] src = other.vals;
+            final double[] dst = this.vals;
+            int sz = this.size;
+            for (int i = 0, n = dst.length; i < n; i++) {
+                double v = src[i];
+                if (v != 0D) {
+                    if (dst[i] == 0D) sz++;
+                    dst[i] = v;
+                }
+            }
+            this.size = sz;
+            return;
+        }
+        super.putAll(m);
+    }
+
     private boolean isValidKey(Object key) {
         if (key == null) return false;
         Class<?> keyClass = key.getClass();
@@ -356,7 +428,8 @@ public final class Enum2DoubleMap<K extends Enum<K>> extends AbstractReference2D
             if (!(o instanceof Map.Entry<?, ?> e)) return false;
             if (!isValidKey(e.getKey())) return false;
             int i = ((Enum<?>) e.getKey()).ordinal();
-            return vals[i] != 0D && Double.valueOf(vals[i]).equals(e.getValue());
+            Object ov = e.getValue();
+            return vals[i] != 0D && ov instanceof Double dv && Double.doubleToLongBits(dv.doubleValue()) == Double.doubleToLongBits(vals[i]);
         }
 
         @Override
@@ -387,24 +460,30 @@ public final class Enum2DoubleMap<K extends Enum<K>> extends AbstractReference2D
         @Override
         public double setValue(double value) {
             double old = vals[index];
-            put(keys[index], value);
+            vals[index] = value;
+            if (value == 0D) {
+                if (old != 0D) size--;
+            } else if (old == 0D) {
+                size++;
+            }
             return old;
         }
 
         @Override
         public boolean equals(Object o) {
             if (!(o instanceof Map.Entry<?, ?> e)) return false;
-            return e.getKey() == keys[index] && Double.valueOf(vals[index]).equals(e.getValue());
+            Object ov = e.getValue();
+            return e.getKey() == keys[index] && ov instanceof Double dv && Double.doubleToLongBits(dv.doubleValue()) == Double.doubleToLongBits(vals[index]);
         }
 
         @Override
         public int hashCode() {
-            return keys[index].hashCode() ^ Double.valueOf(vals[index]).hashCode();
+            return keys[index].hashCode() ^ Double.hashCode(vals[index]);
         }
 
         @Override
         public String toString() {
-            return keys[index] + "=" + Double.valueOf(vals[index]);
+            return keys[index] + "=" + vals[index];
         }
     }
 
@@ -429,7 +508,10 @@ public final class Enum2DoubleMap<K extends Enum<K>> extends AbstractReference2D
 
         public void remove() {
             if (current < 0) throw new IllegalStateException();
-            Enum2DoubleMap.this.put(keys[current], 0D);
+            if (vals[current] != 0D) {
+                vals[current] = 0D;
+                size--;
+            }
             current = -1;
         }
     }

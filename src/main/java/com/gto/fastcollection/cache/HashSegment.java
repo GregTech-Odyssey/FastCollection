@@ -23,14 +23,14 @@ import static it.unimi.dsi.fastutil.HashCommon.arraySize;
  *
  * @param <N> the concrete chain-node type of the subclass
  */
-abstract class HashSegment<N extends ChainNode<N>> extends StampedLock {
+public abstract class HashSegment<N extends ChainNode<N>> extends StampedLock {
 
-    volatile N[] table;
-    volatile int mask;
-    volatile int size;
-    volatile int maxFill;
+    protected volatile N[] table;
+    protected volatile int mask;
+    protected volatile int size;
+    protected volatile int maxFill;
 
-    HashSegment() {
+    protected HashSegment() {
         int n = arraySize(Hash.DEFAULT_INITIAL_SIZE, Hash.DEFAULT_LOAD_FACTOR);
         this.table = newArray(n);
         this.mask = n - 1;

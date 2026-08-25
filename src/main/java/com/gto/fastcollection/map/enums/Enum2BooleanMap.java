@@ -130,13 +130,8 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
 
     @Override
     public boolean containsValue(boolean value) {
-        if (!value) return false;
-        final var vals = Enum2BooleanMap.this.vals;
-        final int length = vals.length;
-        for (int i = 0; i < length; i++) {
-            if (vals[i] == value) return true;
-        }
-        return false;
+        // only true is storable; any present entry is true
+        return value && size > 0;
     }
 
     @Override
@@ -274,6 +269,74 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
         return newValue;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Walks the value array directly (no entry-set allocation). Same-type
+     * peers with the same key universe compare by array equality.
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) return true;
+        if (!(o instanceof Map<?, ?> m)) return false;
+        if (m.size() != size) return false;
+        if (o instanceof Enum2BooleanMap<?> other && other.keyType == keyType) {
+            return Arrays.equals(vals, other.vals);
+        }
+        final var vals = this.vals;
+        final var keys = this.keys;
+        for (int i = 0, n = vals.length; i < n; i++) {
+            if (vals[i]) {
+                Object ov = m.get(keys[i]);
+                if (!(ov instanceof Boolean bv) || !bv.booleanValue()) return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Sum of entry hashes over present slots; matches {@link Map} and the
+     * reused entry's {@code hashCode}.
+     */
+    @Override
+    public int hashCode() {
+        int h = 0;
+        final var vals = this.vals;
+        final var keys = this.keys;
+        // only true is present; Boolean.hashCode(true) == 1231
+        for (int i = 0, n = vals.length; i < n; i++) {
+            if (vals[i]) h += keys[i].hashCode() ^ 1231;
+        }
+        return h;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Same-type peers with the same key universe merge by a single array
+     * pass (no boxing, no entry iteration).
+     */
+    @Override
+    public void putAll(Map<? extends K, ? extends Boolean> m) {
+        if (m instanceof Enum2BooleanMap<?> other && other.keyType == keyType) {
+            if (other.size == 0) return;
+            final boolean[] src = other.vals;
+            final boolean[] dst = this.vals;
+            int sz = this.size;
+            for (int i = 0, n = dst.length; i < n; i++) {
+                if (src[i]) {
+                    if (!dst[i]) sz++;
+                    dst[i] = true;
+                }
+            }
+            this.size = sz;
+            return;
+        }
+        super.putAll(m);
+    }
+
     private boolean isValidKey(Object key) {
         if (key == null) return false;
         Class<?> keyClass = key.getClass();
@@ -324,7 +387,8 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
             if (!(o instanceof Map.Entry<?, ?> e)) return false;
             if (!isValidKey(e.getKey())) return false;
             int i = ((Enum<?>) e.getKey()).ordinal();
-            return vals[i] && Boolean.valueOf(vals[i]).equals(e.getValue());
+            Object ov = e.getValue();
+            return vals[i] && ov instanceof Boolean bv && bv.booleanValue();
         }
 
         @Override
@@ -355,24 +419,30 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
         @Override
         public boolean setValue(boolean value) {
             boolean old = vals[index];
-            put(keys[index], value);
+            vals[index] = value;
+            if (!value) {
+                if (old) size--;
+            } else if (!old) {
+                size++;
+            }
             return old;
         }
 
         @Override
         public boolean equals(Object o) {
             if (!(o instanceof Map.Entry<?, ?> e)) return false;
-            return e.getKey() == keys[index] && Boolean.valueOf(vals[index]).equals(e.getValue());
+            Object ov = e.getValue();
+            return e.getKey() == keys[index] && ov instanceof Boolean bv && bv.booleanValue() == vals[index];
         }
 
         @Override
         public int hashCode() {
-            return keys[index].hashCode() ^ Boolean.valueOf(vals[index]).hashCode();
+            return keys[index].hashCode() ^ Boolean.hashCode(vals[index]);
         }
 
         @Override
         public String toString() {
-            return keys[index] + "=" + Boolean.valueOf(vals[index]);
+            return keys[index] + "=" + vals[index];
         }
     }
 
@@ -397,7 +467,10 @@ public final class Enum2BooleanMap<K extends Enum<K>> extends AbstractReference2
 
         public void remove() {
             if (current < 0) throw new IllegalStateException();
-            Enum2BooleanMap.this.put(keys[current], false);
+            if (vals[current]) {
+                vals[current] = false;
+                size--;
+            }
             current = -1;
         }
     }

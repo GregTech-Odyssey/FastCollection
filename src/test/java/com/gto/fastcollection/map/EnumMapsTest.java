@@ -162,6 +162,36 @@ class EnumMapsTest {
     }
 
     @Test
+    void intMapEqualsHashCodeAndPutAll() {
+        Enum2IntMap<Color> a = new Enum2IntMap<>(Color.class);
+        a.put(Color.RED, 1);
+        a.put(Color.GREEN, 2);
+
+        Enum2IntMap<Color> b = new Enum2IntMap<>(Color.class);
+        b.put(Color.GREEN, 2);
+        b.put(Color.RED, 1);
+        assertThat(a).isEqualTo(b);
+        assertThat(a.hashCode()).isEqualTo(b.hashCode());
+
+        Enum2IntMap<Color> c = new Enum2IntMap<>(Color.class);
+        c.put(Color.RED, 1);
+        assertThat(a).isNotEqualTo(c);
+
+        Enum2IntMap<Color> dest = new Enum2IntMap<>(Color.class);
+        dest.put(Color.BLUE, 9);
+        dest.putAll(a);
+        assertThat(dest.getInt(Color.RED)).isEqualTo(1);
+        assertThat(dest.getInt(Color.GREEN)).isEqualTo(2);
+        assertThat(dest.getInt(Color.BLUE)).isEqualTo(9);
+        assertThat(dest.size()).isEqualTo(3);
+
+        // putAll overwrites existing same-key slots without double-counting size
+        dest.putAll(a);
+        assertThat(dest.size()).isEqualTo(3);
+        assertThat(dest.getInt(Color.RED)).isEqualTo(1);
+    }
+
+    @Test
     void intMapZeroValueMeansAbsent() {
         Enum2IntMap<Color> m = new Enum2IntMap<>(Color.class);
 

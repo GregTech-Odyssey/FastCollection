@@ -306,6 +306,76 @@ public final class Enum2LongMap<K extends Enum<K>> extends AbstractReference2Lon
         return newValue;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Walks the value array directly (no entry-set allocation). Same-type
+     * peers with the same key universe compare by array equality.
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) return true;
+        if (!(o instanceof Map<?, ?> m)) return false;
+        if (m.size() != size) return false;
+        if (o instanceof Enum2LongMap<?> other && other.keyType == keyType) {
+            return Arrays.equals(vals, other.vals);
+        }
+        final var vals = this.vals;
+        final var keys = this.keys;
+        for (int i = 0, n = vals.length; i < n; i++) {
+            long v = vals[i];
+            if (v != 0L) {
+                Object ov = m.get(keys[i]);
+                if (!(ov instanceof Long lv) || lv.longValue() != v) return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Sum of entry hashes over present slots; matches {@link Map} and the
+     * reused entry's {@code hashCode}.
+     */
+    @Override
+    public int hashCode() {
+        int h = 0;
+        final var vals = this.vals;
+        final var keys = this.keys;
+        for (int i = 0, n = vals.length; i < n; i++) {
+            long v = vals[i];
+            if (v != 0L) h += keys[i].hashCode() ^ Long.hashCode(v);
+        }
+        return h;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Same-type peers with the same key universe merge by a single array
+     * pass (no boxing, no entry iteration).
+     */
+    @Override
+    public void putAll(Map<? extends K, ? extends Long> m) {
+        if (m instanceof Enum2LongMap<?> other && other.keyType == keyType) {
+            if (other.size == 0) return;
+            final long[] src = other.vals;
+            final long[] dst = this.vals;
+            int sz = this.size;
+            for (int i = 0, n = dst.length; i < n; i++) {
+                long v = src[i];
+                if (v != 0L) {
+                    if (dst[i] == 0L) sz++;
+                    dst[i] = v;
+                }
+            }
+            this.size = sz;
+            return;
+        }
+        super.putAll(m);
+    }
+
     private boolean isValidKey(Object key) {
         if (key == null) return false;
         Class<?> keyClass = key.getClass();
@@ -356,7 +426,8 @@ public final class Enum2LongMap<K extends Enum<K>> extends AbstractReference2Lon
             if (!(o instanceof Map.Entry<?, ?> e)) return false;
             if (!isValidKey(e.getKey())) return false;
             int i = ((Enum<?>) e.getKey()).ordinal();
-            return vals[i] != 0L && Long.valueOf(vals[i]).equals(e.getValue());
+            Object ov = e.getValue();
+            return vals[i] != 0L && ov instanceof Long lv && lv.longValue() == vals[i];
         }
 
         @Override
@@ -387,24 +458,30 @@ public final class Enum2LongMap<K extends Enum<K>> extends AbstractReference2Lon
         @Override
         public long setValue(long value) {
             long old = vals[index];
-            put(keys[index], value);
+            vals[index] = value;
+            if (value == 0L) {
+                if (old != 0L) size--;
+            } else if (old == 0L) {
+                size++;
+            }
             return old;
         }
 
         @Override
         public boolean equals(Object o) {
             if (!(o instanceof Map.Entry<?, ?> e)) return false;
-            return e.getKey() == keys[index] && Long.valueOf(vals[index]).equals(e.getValue());
+            Object ov = e.getValue();
+            return e.getKey() == keys[index] && ov instanceof Long lv && lv.longValue() == vals[index];
         }
 
         @Override
         public int hashCode() {
-            return keys[index].hashCode() ^ Long.valueOf(vals[index]).hashCode();
+            return keys[index].hashCode() ^ Long.hashCode(vals[index]);
         }
 
         @Override
         public String toString() {
-            return keys[index] + "=" + Long.valueOf(vals[index]);
+            return keys[index] + "=" + vals[index];
         }
     }
 
@@ -429,7 +506,10 @@ public final class Enum2LongMap<K extends Enum<K>> extends AbstractReference2Lon
 
         public void remove() {
             if (current < 0) throw new IllegalStateException();
-            Enum2LongMap.this.put(keys[current], 0L);
+            if (vals[current] != 0L) {
+                vals[current] = 0L;
+                size--;
+            }
             current = -1;
         }
     }

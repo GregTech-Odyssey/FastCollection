@@ -307,6 +307,76 @@ public final class Enum2ShortMap<K extends Enum<K>> extends AbstractReference2Sh
         return newValue;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Walks the value array directly (no entry-set allocation). Same-type
+     * peers with the same key universe compare by array equality.
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) return true;
+        if (!(o instanceof Map<?, ?> m)) return false;
+        if (m.size() != size) return false;
+        if (o instanceof Enum2ShortMap<?> other && other.keyType == keyType) {
+            return Arrays.equals(vals, other.vals);
+        }
+        final var vals = this.vals;
+        final var keys = this.keys;
+        for (int i = 0, n = vals.length; i < n; i++) {
+            short v = vals[i];
+            if (v != (short) 0) {
+                Object ov = m.get(keys[i]);
+                if (!(ov instanceof Short sv) || sv.shortValue() != v) return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Sum of entry hashes over present slots; matches {@link Map} and the
+     * reused entry's {@code hashCode}.
+     */
+    @Override
+    public int hashCode() {
+        int h = 0;
+        final var vals = this.vals;
+        final var keys = this.keys;
+        for (int i = 0, n = vals.length; i < n; i++) {
+            short v = vals[i];
+            if (v != (short) 0) h += keys[i].hashCode() ^ v;
+        }
+        return h;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Same-type peers with the same key universe merge by a single array
+     * pass (no boxing, no entry iteration).
+     */
+    @Override
+    public void putAll(Map<? extends K, ? extends Short> m) {
+        if (m instanceof Enum2ShortMap<?> other && other.keyType == keyType) {
+            if (other.size == 0) return;
+            final short[] src = other.vals;
+            final short[] dst = this.vals;
+            int sz = this.size;
+            for (int i = 0, n = dst.length; i < n; i++) {
+                short v = src[i];
+                if (v != (short) 0) {
+                    if (dst[i] == (short) 0) sz++;
+                    dst[i] = v;
+                }
+            }
+            this.size = sz;
+            return;
+        }
+        super.putAll(m);
+    }
+
     private boolean isValidKey(Object key) {
         if (key == null) return false;
         Class<?> keyClass = key.getClass();
@@ -357,7 +427,8 @@ public final class Enum2ShortMap<K extends Enum<K>> extends AbstractReference2Sh
             if (!(o instanceof Map.Entry<?, ?> e)) return false;
             if (!isValidKey(e.getKey())) return false;
             int i = ((Enum<?>) e.getKey()).ordinal();
-            return vals[i] != (short) 0 && Short.valueOf(vals[i]).equals(e.getValue());
+            Object ov = e.getValue();
+            return vals[i] != (short) 0 && ov instanceof Short sv && sv.shortValue() == vals[i];
         }
 
         @Override
@@ -388,24 +459,30 @@ public final class Enum2ShortMap<K extends Enum<K>> extends AbstractReference2Sh
         @Override
         public short setValue(short value) {
             short old = vals[index];
-            put(keys[index], value);
+            vals[index] = value;
+            if (value == (short) 0) {
+                if (old != (short) 0) size--;
+            } else if (old == (short) 0) {
+                size++;
+            }
             return old;
         }
 
         @Override
         public boolean equals(Object o) {
             if (!(o instanceof Map.Entry<?, ?> e)) return false;
-            return e.getKey() == keys[index] && Short.valueOf(vals[index]).equals(e.getValue());
+            Object ov = e.getValue();
+            return e.getKey() == keys[index] && ov instanceof Short sv && sv.shortValue() == vals[index];
         }
 
         @Override
         public int hashCode() {
-            return keys[index].hashCode() ^ Short.valueOf(vals[index]).hashCode();
+            return keys[index].hashCode() ^ vals[index];
         }
 
         @Override
         public String toString() {
-            return keys[index] + "=" + Short.valueOf(vals[index]);
+            return keys[index] + "=" + vals[index];
         }
     }
 
@@ -430,7 +507,10 @@ public final class Enum2ShortMap<K extends Enum<K>> extends AbstractReference2Sh
 
         public void remove() {
             if (current < 0) throw new IllegalStateException();
-            Enum2ShortMap.this.put(keys[current], (short) 0);
+            if (vals[current] != (short) 0) {
+                vals[current] = (short) 0;
+                size--;
+            }
             current = -1;
         }
     }

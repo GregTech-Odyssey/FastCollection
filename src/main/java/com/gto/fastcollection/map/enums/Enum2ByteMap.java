@@ -314,6 +314,76 @@ public final class Enum2ByteMap<K extends Enum<K>> extends AbstractReference2Byt
         return newValue;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Walks the value array directly (no entry-set allocation). Same-type
+     * peers with the same key universe compare by array equality.
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) return true;
+        if (!(o instanceof Map<?, ?> m)) return false;
+        if (m.size() != size) return false;
+        if (o instanceof Enum2ByteMap<?> other && other.keyType == keyType) {
+            return Arrays.equals(vals, other.vals);
+        }
+        final var vals = this.vals;
+        final var keys = this.keys;
+        for (int i = 0, n = vals.length; i < n; i++) {
+            byte v = vals[i];
+            if (v != (byte) 0) {
+                Object ov = m.get(keys[i]);
+                if (!(ov instanceof Byte bv) || bv.byteValue() != v) return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Sum of entry hashes over present slots; matches {@link Map} and the
+     * reused entry's {@code hashCode}.
+     */
+    @Override
+    public int hashCode() {
+        int h = 0;
+        final var vals = this.vals;
+        final var keys = this.keys;
+        for (int i = 0, n = vals.length; i < n; i++) {
+            byte v = vals[i];
+            if (v != (byte) 0) h += keys[i].hashCode() ^ v;
+        }
+        return h;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Same-type peers with the same key universe merge by a single array
+     * pass (no boxing, no entry iteration).
+     */
+    @Override
+    public void putAll(Map<? extends K, ? extends Byte> m) {
+        if (m instanceof Enum2ByteMap<?> other && other.keyType == keyType) {
+            if (other.size == 0) return;
+            final byte[] src = other.vals;
+            final byte[] dst = this.vals;
+            int sz = this.size;
+            for (int i = 0, n = dst.length; i < n; i++) {
+                byte v = src[i];
+                if (v != (byte) 0) {
+                    if (dst[i] == (byte) 0) sz++;
+                    dst[i] = v;
+                }
+            }
+            this.size = sz;
+            return;
+        }
+        super.putAll(m);
+    }
+
     private boolean isValidKey(Object key) {
         if (key == null) return false;
         Class<?> keyClass = key.getClass();
@@ -364,7 +434,8 @@ public final class Enum2ByteMap<K extends Enum<K>> extends AbstractReference2Byt
             if (!(o instanceof Map.Entry<?, ?> e)) return false;
             if (!isValidKey(e.getKey())) return false;
             int i = ((Enum<?>) e.getKey()).ordinal();
-            return vals[i] != (byte) 0 && Byte.valueOf(vals[i]).equals(e.getValue());
+            Object ov = e.getValue();
+            return vals[i] != (byte) 0 && ov instanceof Byte bv && bv.byteValue() == vals[i];
         }
 
         @Override
@@ -395,24 +466,30 @@ public final class Enum2ByteMap<K extends Enum<K>> extends AbstractReference2Byt
         @Override
         public byte setValue(byte value) {
             byte old = vals[index];
-            put(keys[index], value);
+            vals[index] = value;
+            if (value == (byte) 0) {
+                if (old != (byte) 0) size--;
+            } else if (old == (byte) 0) {
+                size++;
+            }
             return old;
         }
 
         @Override
         public boolean equals(Object o) {
             if (!(o instanceof Map.Entry<?, ?> e)) return false;
-            return e.getKey() == keys[index] && Byte.valueOf(vals[index]).equals(e.getValue());
+            Object ov = e.getValue();
+            return e.getKey() == keys[index] && ov instanceof Byte bv && bv.byteValue() == vals[index];
         }
 
         @Override
         public int hashCode() {
-            return keys[index].hashCode() ^ Byte.valueOf(vals[index]).hashCode();
+            return keys[index].hashCode() ^ vals[index];
         }
 
         @Override
         public String toString() {
-            return keys[index] + "=" + Byte.valueOf(vals[index]);
+            return keys[index] + "=" + vals[index];
         }
     }
 
@@ -437,7 +514,10 @@ public final class Enum2ByteMap<K extends Enum<K>> extends AbstractReference2Byt
 
         public void remove() {
             if (current < 0) throw new IllegalStateException();
-            Enum2ByteMap.this.put(keys[current], (byte) 0);
+            if (vals[current] != (byte) 0) {
+                vals[current] = (byte) 0;
+                size--;
+            }
             current = -1;
         }
     }

@@ -10,7 +10,7 @@ import java.util.function.IntFunction;
  *
  * @param <SEG> the concrete segment type
  */
-abstract class Segmented<SEG extends HashSegment<?>> {
+public abstract class Segmented<SEG extends HashSegment<?>> {
 
     private final SEG[] segments;
     private final int segmentShift;
@@ -20,7 +20,7 @@ abstract class Segmented<SEG extends HashSegment<?>> {
      * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
      */
     @SuppressWarnings("unchecked")
-    Segmented(int concurrencyLevel, IntFunction<? extends SEG> segmentFactory) {
+    protected Segmented(int concurrencyLevel, IntFunction<? extends SEG> segmentFactory) {
         if (concurrencyLevel <= 0) throw new IllegalArgumentException("concurrencyLevel must be positive");
         int ssize = 1;
         while (ssize < concurrencyLevel) {

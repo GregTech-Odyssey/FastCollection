@@ -260,6 +260,92 @@ public final class Enum2ObjectMap<K extends Enum<K>, V> extends AbstractReferenc
         return newValue;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Walks the value array directly (no entry-set allocation). Same-type
+     * peers with the same key universe compare slots by identity of the
+     * stored mask (including the null sentinel).
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) return true;
+        if (!(o instanceof Map<?, ?> m)) return false;
+        if (m.size() != size) return false;
+        if (o instanceof Enum2ObjectMap<?, ?> other && other.keyType == keyType) {
+            final Object[] a = this.vals;
+            final Object[] b = other.vals;
+            for (int i = 0, n = a.length; i < n; i++) {
+                Object av = a[i];
+                Object bv = b[i];
+                if (av == bv) continue;
+                if (av == null || bv == null) return false;
+                if (!Objects.equals(unmaskNull(av), unmaskNull(bv))) return false;
+            }
+            return true;
+        }
+        final var vals = this.vals;
+        final var keys = this.keys;
+        for (int i = 0, n = vals.length; i < n; i++) {
+            Object v = vals[i];
+            if (v != null) {
+                V uv = unmaskNull(v);
+                if (uv == null) {
+                    // present null: peer must contain the key with a null value
+                    if (!m.containsKey(keys[i]) || m.get(keys[i]) != null) return false;
+                } else {
+                    if (!uv.equals(m.get(keys[i]))) return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Sum of entry hashes over present slots; matches {@link Map} and the
+     * reused entry's {@code hashCode}.
+     */
+    @Override
+    public int hashCode() {
+        int h = 0;
+        final var vals = this.vals;
+        final var keys = this.keys;
+        for (int i = 0, n = vals.length; i < n; i++) {
+            Object v = vals[i];
+            if (v != null) h += keys[i].hashCode() ^ Objects.hashCode(unmaskNull(v));
+        }
+        return h;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Same-type peers with the same key universe merge by a single array
+     * pass (no entry iteration).
+     */
+    @Override
+    @SuppressWarnings("unchecked")
+    public void putAll(Map<? extends K, ? extends V> m) {
+        if (m instanceof Enum2ObjectMap<?, ?> other && other.keyType == keyType) {
+            if (other.size == 0) return;
+            final Object[] src = other.vals;
+            final Object[] dst = this.vals;
+            int sz = this.size;
+            for (int i = 0, n = dst.length; i < n; i++) {
+                Object v = src[i];
+                if (v != null) {
+                    if (dst[i] == null) sz++;
+                    dst[i] = v;
+                }
+            }
+            this.size = sz;
+            return;
+        }
+        super.putAll(m);
+    }
+
     private boolean isValidKey(Object key) {
         if (key == null) return false;
         Class<?> keyClass = key.getClass();
@@ -392,7 +478,10 @@ public final class Enum2ObjectMap<K extends Enum<K>, V> extends AbstractReferenc
 
         public void remove() {
             if (current < 0) throw new IllegalStateException();
-            Enum2ObjectMap.this.remove(keys[current]);
+            if (vals[current] != null) {
+                vals[current] = null;
+                size--;
+            }
             current = -1;
         }
     }

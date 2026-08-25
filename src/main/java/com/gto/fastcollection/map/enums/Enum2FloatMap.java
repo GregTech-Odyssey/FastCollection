@@ -125,10 +125,11 @@ public final class Enum2FloatMap<K extends Enum<K>> extends AbstractReference2Fl
     @Override
     public boolean containsValue(float value) {
         if (value == 0F) return false;
+        final int bits = Float.floatToIntBits(value);
         final var vals = Enum2FloatMap.this.vals;
         final int length = vals.length;
         for (int i = 0; i < length; i++) {
-            if (vals[i] == value) return true;
+            if (Float.floatToIntBits(vals[i]) == bits) return true;
         }
         return false;
     }
@@ -307,6 +308,77 @@ public final class Enum2FloatMap<K extends Enum<K>> extends AbstractReference2Fl
         return newValue;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Walks the value array directly (no entry-set allocation). Same-type
+     * peers with the same key universe compare by array equality
+     * ({@link Arrays#equals(float[], float[])}, bit-exact).
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) return true;
+        if (!(o instanceof Map<?, ?> m)) return false;
+        if (m.size() != size) return false;
+        if (o instanceof Enum2FloatMap<?> other && other.keyType == keyType) {
+            return Arrays.equals(vals, other.vals);
+        }
+        final var vals = this.vals;
+        final var keys = this.keys;
+        for (int i = 0, n = vals.length; i < n; i++) {
+            float v = vals[i];
+            if (v != 0F) {
+                Object ov = m.get(keys[i]);
+                if (!(ov instanceof Float fv) || Float.floatToIntBits(fv.floatValue()) != Float.floatToIntBits(v)) return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Sum of entry hashes over present slots; matches {@link Map} and the
+     * reused entry's {@code hashCode}.
+     */
+    @Override
+    public int hashCode() {
+        int h = 0;
+        final var vals = this.vals;
+        final var keys = this.keys;
+        for (int i = 0, n = vals.length; i < n; i++) {
+            float v = vals[i];
+            if (v != 0F) h += keys[i].hashCode() ^ Float.hashCode(v);
+        }
+        return h;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Same-type peers with the same key universe merge by a single array
+     * pass (no boxing, no entry iteration).
+     */
+    @Override
+    public void putAll(Map<? extends K, ? extends Float> m) {
+        if (m instanceof Enum2FloatMap<?> other && other.keyType == keyType) {
+            if (other.size == 0) return;
+            final float[] src = other.vals;
+            final float[] dst = this.vals;
+            int sz = this.size;
+            for (int i = 0, n = dst.length; i < n; i++) {
+                float v = src[i];
+                if (v != 0F) {
+                    if (dst[i] == 0F) sz++;
+                    dst[i] = v;
+                }
+            }
+            this.size = sz;
+            return;
+        }
+        super.putAll(m);
+    }
+
     private boolean isValidKey(Object key) {
         if (key == null) return false;
         Class<?> keyClass = key.getClass();
@@ -357,7 +429,8 @@ public final class Enum2FloatMap<K extends Enum<K>> extends AbstractReference2Fl
             if (!(o instanceof Map.Entry<?, ?> e)) return false;
             if (!isValidKey(e.getKey())) return false;
             int i = ((Enum<?>) e.getKey()).ordinal();
-            return vals[i] != 0F && Float.valueOf(vals[i]).equals(e.getValue());
+            Object ov = e.getValue();
+            return vals[i] != 0F && ov instanceof Float fv && Float.floatToIntBits(fv.floatValue()) == Float.floatToIntBits(vals[i]);
         }
 
         @Override
@@ -388,24 +461,30 @@ public final class Enum2FloatMap<K extends Enum<K>> extends AbstractReference2Fl
         @Override
         public float setValue(float value) {
             float old = vals[index];
-            put(keys[index], value);
+            vals[index] = value;
+            if (value == 0F) {
+                if (old != 0F) size--;
+            } else if (old == 0F) {
+                size++;
+            }
             return old;
         }
 
         @Override
         public boolean equals(Object o) {
             if (!(o instanceof Map.Entry<?, ?> e)) return false;
-            return e.getKey() == keys[index] && Float.valueOf(vals[index]).equals(e.getValue());
+            Object ov = e.getValue();
+            return e.getKey() == keys[index] && ov instanceof Float fv && Float.floatToIntBits(fv.floatValue()) == Float.floatToIntBits(vals[index]);
         }
 
         @Override
         public int hashCode() {
-            return keys[index].hashCode() ^ Float.valueOf(vals[index]).hashCode();
+            return keys[index].hashCode() ^ Float.hashCode(vals[index]);
         }
 
         @Override
         public String toString() {
-            return keys[index] + "=" + Float.valueOf(vals[index]);
+            return keys[index] + "=" + vals[index];
         }
     }
 
@@ -430,7 +509,10 @@ public final class Enum2FloatMap<K extends Enum<K>> extends AbstractReference2Fl
 
         public void remove() {
             if (current < 0) throw new IllegalStateException();
-            Enum2FloatMap.this.put(keys[current], 0F);
+            if (vals[current] != 0F) {
+                vals[current] = 0F;
+                size--;
+            }
             current = -1;
         }
     }

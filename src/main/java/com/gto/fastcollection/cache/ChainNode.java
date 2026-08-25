@@ -10,7 +10,7 @@ package com.gto.fastcollection.cache;
  *
  * @param <N> the concrete node type, so relinking stays type-safe
  */
-interface ChainNode<N extends ChainNode<N>> {
+public interface ChainNode<N extends ChainNode<N>> {
 
     /**
      * The successor of this node in its chain.
