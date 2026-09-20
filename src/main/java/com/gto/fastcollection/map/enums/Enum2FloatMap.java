@@ -271,8 +271,8 @@ public final class Enum2FloatMap<K extends Enum<K>> extends AbstractReference2Fl
 
     /**
      * Adds {@code incr} to the value of {@code key} and stores the sum; an
-     * absent key starts from {@code 0F}. A sum of {@code 0F} removes the
-     * mapping (the zero-value sentinel).
+     * absent key starts from {@link #defRetValue} (zero by default). A sum of
+     * {@code 0F} removes the mapping (the zero-value sentinel).
      *
      * @return the previous value, or {@code defRetValue} if the key was absent
      */
@@ -280,8 +280,10 @@ public final class Enum2FloatMap<K extends Enum<K>> extends AbstractReference2Fl
         int i = key.ordinal();
         float old = vals[i];
         if (old == 0F) {
-            if (incr == 0F) return defRetValue;
-            vals[i] = incr;
+            // an absent key starts from defRetValue, exactly like getFloat(key) reports
+            float sum = defRetValue + incr;
+            if (sum == 0F) return defRetValue;
+            vals[i] = sum;
             size++;
             return defRetValue;
         }
