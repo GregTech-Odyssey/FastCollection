@@ -1,4 +1,4 @@
-package com.gto.fastcollection.cache.legacy;
+package com.gto.fastcollection.cache;
 
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;

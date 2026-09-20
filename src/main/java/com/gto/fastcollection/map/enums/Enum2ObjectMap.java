@@ -203,14 +203,11 @@ public final class Enum2ObjectMap<K extends Enum<K>, V> extends AbstractReferenc
     public V computeIfAbsent(K key, java.util.function.Function<? super K, ? extends V> mappingFunction) {
         int i = key.ordinal();
         Object old = vals[i];
-        V present = unmaskNull(old);
-        // like Map.computeIfAbsent / Reference2ReferenceOpenHashMap: a key bound to
-        // null is recomputed, an absent one is created
-        if (present != null) return present;
+        if (old != null) return unmaskNull(old);
         V newValue = mappingFunction.apply(key);
         if (newValue != null) {
             vals[i] = maskNull(newValue);
-            if (old == null) size++;
+            size++;
         }
         return newValue;
     }
@@ -218,10 +215,9 @@ public final class Enum2ObjectMap<K extends Enum<K>, V> extends AbstractReferenc
     @Override
     public V computeIfPresent(K key, java.util.function.BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
         int i = key.ordinal();
-        V oldValue = unmaskNull(vals[i]);
-        // a bound null is not a value for this operation: no remapping, no removal
-        if (oldValue == null) return defRetValue;
-        V newValue = remappingFunction.apply(key, oldValue);
+        Object old = vals[i];
+        if (old == null) return defRetValue;
+        V newValue = remappingFunction.apply(key, unmaskNull(old));
         if (newValue == null) {
             vals[i] = null;
             size--;
@@ -244,19 +240,15 @@ public final class Enum2ObjectMap<K extends Enum<K>, V> extends AbstractReferenc
             return defRetValue;
         }
         vals[i] = maskNull(newValue);
-        if (old == null) size++;
         return newValue;
     }
 
     @Override
     public V merge(K key, V value, java.util.function.BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
-        // like Map.merge / Reference2ReferenceOpenHashMap: a null value is rejected,
-        // and a key bound to null counts as absent for this operation
-        Objects.requireNonNull(value);
+        if (value == null) return defRetValue;
         int i = key.ordinal();
         Object old = vals[i];
-        V oldValue = unmaskNull(old);
-        V newValue = oldValue == null ? value : remappingFunction.apply(oldValue, value);
+        V newValue = old == null ? value : remappingFunction.apply(unmaskNull(old), value);
         if (newValue == null) {
             if (old != null) {
                 vals[i] = null;
@@ -265,7 +257,6 @@ public final class Enum2ObjectMap<K extends Enum<K>, V> extends AbstractReferenc
             return defRetValue;
         }
         vals[i] = maskNull(newValue);
-        if (old == null) size++;
         return newValue;
     }
 

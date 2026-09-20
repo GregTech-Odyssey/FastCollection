@@ -1,9 +1,15 @@
 package com.gto.fastcollection.cache;
 
+import com.gto.fastcollection.Concurrents;
+import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 
+import java.util.Arrays;
+import java.util.concurrent.locks.StampedLock;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
+
+import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 
 /**
  * A {@link MapCache} with identity-based keys: keys are hashed with
@@ -12,27 +18,47 @@ import java.util.function.UnaryOperator;
  * method. This is the cache to use when you want to key by object identity (e.g.
  * per-instance attributes) rather than by value.
  *
- * <p>The cache <em>is</em> the table: it extends {@link OpenCacheTable} directly
- * (no delegation), so one open-addressed slot array serves the whole cache, reads
- * are lock-free, writes compare-and-set while holding the shared stamp, and only
- * a resize takes the exclusive stamp.
+ * <p>Thread safety mirrors {@link CustomHashCache}: power-of-two segments, each
+ * guarded by its own {@link StampedLock}; reads take the shared read lock and
+ * writes the exclusive write lock.
  */
-public final class IdentityHashCache<K, V> extends OpenCacheTable<IdentityHashCache.Node<K, V>> implements MapCache<K, V> {
+public final class IdentityHashCache<K, V> extends Segmented<IdentityHashCache.Segment<K, V>> implements MapCache<K, V> {
 
     private final Function<? super K, ? extends V> createFunction;
 
     /**
-     * Creates a cache with no default create function.
+     * Creates a cache with default concurrency and no default create function.
      */
     public IdentityHashCache() {
-        this.createFunction = null;
+        this(Concurrents.NCPU, null);
     }
 
     /**
-     * Creates a cache with the given default create function; {@code null} is
-     * allowed and behaves like the no-factory constructor.
+     * Creates a cache with default concurrency and the given default create
+     * function; {@code null} is allowed and behaves like the no-factory
+     * constructor.
      */
     public IdentityHashCache(Function<? super K, ? extends V> createFunction) {
+        this(Concurrents.NCPU, createFunction);
+    }
+
+    /**
+     * Creates a cache with the given concurrency level and no default create
+     * function.
+     *
+     * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
+     */
+    public IdentityHashCache(int concurrencyLevel) {
+        this(concurrencyLevel, null);
+    }
+
+    /**
+     * Creates a cache with the given concurrency level and default create function.
+     *
+     * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
+     */
+    public IdentityHashCache(int concurrencyLevel, Function<? super K, ? extends V> createFunction) {
+        super(concurrencyLevel, i -> new Segment<>());
         this.createFunction = createFunction;
     }
 
@@ -41,24 +67,33 @@ public final class IdentityHashCache<K, V> extends OpenCacheTable<IdentityHashCa
         return createFunction;
     }
 
+
     @Override
     public V getCache(final K k, Function<? super K, ? extends V> createFunction) {
-        return this.getCache(k, mix(k), createFunction, Interner.identityMappingFunction());
+        int hash = System.identityHashCode(k);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).getCache(k, mix, createFunction, Interner.identityMappingFunction());
     }
 
     @Override
     public V getCache(K k, Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction) {
-        return this.getCache(k, mix(k), createFunction, keyMappingFunction);
+        int hash = System.identityHashCode(k);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).getCache(k, mix, createFunction, keyMappingFunction);
     }
 
     @Override
     public V getCacheRecursive(final K k, Function<? super K, ? extends V> createFunction) {
-        return this.getCache(k, mix(k), createFunction, Interner.identityMappingFunction());
+        int hash = System.identityHashCode(k);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).getCache(k, mix, createFunction, Interner.identityMappingFunction());
     }
 
     @Override
     public V getCacheRecursive(final K k, Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction) {
-        return this.getCache(k, mix(k), createFunction, keyMappingFunction);
+        int hash = System.identityHashCode(k);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).getCache(k, mix, createFunction, keyMappingFunction);
     }
 
     /**
@@ -66,7 +101,9 @@ public final class IdentityHashCache<K, V> extends OpenCacheTable<IdentityHashCa
      */
     @Override
     public V getIfPresent(final K k) {
-        return this.getIfAbsent(k, mix(k));
+        int hash = System.identityHashCode(k);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).getIfAbsent(k, mix);
     }
 
     /**
@@ -74,131 +111,156 @@ public final class IdentityHashCache<K, V> extends OpenCacheTable<IdentityHashCa
      */
     @Override
     public V putIfAbsent(final K k, final V v) {
-        return this.putIfAbsent(k, v, mix(k));
+        int hash = System.identityHashCode(k);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).put(k, v, mix);
     }
 
     /**
-     * The mixed hash of a key: computed once per public call and threaded down,
-     * so no hot path recomputes it.
+     * {@inheritDoc}
      */
-    private static int mix(Object k) {
-        return HashCommon.mix(System.identityHashCode(k));
-    }
-
     @Override
-    protected int hashOf(Node<K, V> node) {
-        return mix(node.key);
-    }
-
-    @Override
-    protected boolean isDead(Node<K, V> node) {
-        return false;
+    public void clear() {
+        clearSegments();
     }
 
     /**
-     * Read-only lookup; never stores anything.
+     * A striped segment: an independently locked separate-chaining hash table
+     * on the shared {@link HashSegment} skeleton; keys are compared by identity
+     * ({@code ==}) and nodes store no hash, so resizing re-derives it.
      */
-    @SuppressWarnings("unchecked")
-    private V getIfAbsent(final K k, final int mix) {
-        final Object[] table = slots;
-        final int mask = table.length - 1;
-        int index = mix & mask;
-        for (int steps = 0; steps <= mask; steps++, index = (index + 1) & mask) {
-            final Object raw = SLOT.getAcquire(table, index);
-            if (raw == null) return null;
-            final Node<K, V> node = (Node<K, V>) raw;
-            if (node.key == k) return node.value;
+    final static class Segment<K, V> extends HashSegment<Node<K, V>> {
+
+        private Segment() {
         }
-        return null; // probe walked the whole table: treat as absent
-    }
 
-    /**
-     * Probes without locking, runs the function outside every lock so it may
-     * call back into this cache, then inserts with compare-and-set, keeping the
-     * value computed by another thread if one landed first. A function returning
-     * {@code null} stores nothing.
-     */
-    @SuppressWarnings("unchecked")
-    private V getCache(final K k, final int mix,
-                       Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction) {
-        final Object[] table = slots;
-        final int mask = table.length - 1;
-        int index = mix & mask;
-        for (int steps = 0; steps <= mask; steps++, index = (index + 1) & mask) {
-            final Object raw = SLOT.getAcquire(table, index);
-            if (raw == null) break;
-            final Node<K, V> node = (Node<K, V>) raw;
-            if (node.key == k) return node.value;
+        @Override
+        @SuppressWarnings("unchecked")
+        protected Node<K, V>[] newArray(int capacity) {
+            return new Node[capacity];
         }
-        final K mapped = keyMappingFunction.apply(k);
-        final V value = createFunction.apply(mapped);
-        if (value == null) return null;
-        return putIfAbsent(mapped, value, mix);
-    }
 
-    /**
-     * Inserts unless the key is already bound; returns the value now bound.
-     * Holds the shared stamp 閳?writers stay parallel 閳?and compare-and-sets into
-     * the first free slot of the probe sequence using the value the probe
-     * observed there, so a competing writer makes it fail and the probe restart.
-     */
-    @SuppressWarnings("unchecked")
-    private V putIfAbsent(final K k, final V v, final int mix) {
-        if (v == null) return null;
-        for (; ; ) {
-            final long stamp = readLock();
-            boolean resize;
-            boolean done = false;
+        @Override
+        protected int nodeHash(Node<K, V> node) {
+            return System.identityHashCode(node.key);
+        }
+
+        @Override
+        protected boolean isDead(Node<K, V> node) {
+            return false;
+        }
+
+        /**
+         * Recursive variant: probes under the read lock, runs the function with
+         * every lock released so it may call back into this cache, and finally
+         * stores the result under the write lock, keeping the value computed by
+         * another thread if one landed first.
+         */
+        private V getCache(final K k, final int mix, Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction) {
+            long stamp = readLock();
             try {
-                final Object[] table = slots;
-                final int mask = table.length - 1;
-                int vacant = -1;
-                Object vacantValue = null;
-                int index = mix & mask;
-                for (int steps = 0; steps <= mask; steps++, index = (index + 1) & mask) {
-                    final Object raw = SLOT.getAcquire(table, index);
-                    if (raw == null) {
-                        if (vacant < 0) {
-                            vacant = index;
-                            vacantValue = null;
-                        }
-                        break;
+                Node<K, V> curr = table[mix & mask];
+                while (curr != null) {
+                    if (curr.key == k) {
+                        return curr.value;
                     }
-                    final Node<K, V> node = (Node<K, V>) raw;
-                    if (node.key == k) return node.value;
-                }
-                if (vacant < 0) {
-                    // The probe walked the whole table without a free slot: this is the
-                    // only case that must grow *before* inserting.
-                    resize = true;
-                } else if (SLOT.compareAndSet(table, vacant, vacantValue, new Node<>(k, v))) {
-                    size++;
-                    // Inserted first; only now look at the load factor, exactly like
-                    // ConcurrentHashMap's addCount after putVal.
-                    done = true;
-                    resize = shouldGrow();
-                } else {
-                    continue; // lost the slot to another writer: retry, no resize needed
+                    curr = curr.next;
                 }
             } finally {
                 unlockRead(stamp);
             }
-            if (resize) grow();
-            if (done) return v;
+            // Run outside all locks so the function may call back into this cache.
+            final var mapped = keyMappingFunction.apply(k);
+            final var v = createFunction.apply(mapped);
+            stamp = writeLock();
+            try {
+                final int index = mix & mask;
+                Node<K, V> curr = table[index];
+                while (curr != null) {
+                    if (curr.key == mapped) {
+                        return curr.value;
+                    }
+                    curr = curr.next;
+                }
+                table[index] = new Node<>(mapped, v, table[index]);
+                if (++size > maxFill) {
+                    resize();
+                }
+                return v;
+            } finally {
+                unlockWrite(stamp);
+            }
+        }
+
+        /**
+         * Read-only lookup; never stores anything.
+         */
+        private V getIfAbsent(final K k, final int mix) {
+            long stamp = readLock();
+            try {
+                final int index = mix & mask;
+                Node<K, V> curr = table[index];
+                while (curr != null) {
+                    if (curr.key == k) {
+                        return curr.value;
+                    }
+                    curr = curr.next;
+                }
+                return null;
+            } finally {
+                unlockRead(stamp);
+            }
+        }
+
+        /**
+         * Inserts only if absent, returning the value now bound to the key.
+         */
+        private V put(final K k, final V v, final int mix) {
+            long stamp = writeLock();
+            try {
+                final int index = mix & mask;
+                final Node<K, V> node = table[index];
+                Node<K, V> curr = node;
+                while (curr != null) {
+                    if (curr.key == k) {
+                        return curr.value;
+                    }
+                    curr = curr.next;
+                }
+                table[index] = new Node<>(k, v, node);
+                if (++size > maxFill) {
+                    resize();
+                }
+                return v;
+            } finally {
+                unlockWrite(stamp);
+            }
         }
     }
 
     /**
-     * A single slot entry; immutable.
+     * A single entry in a chain; immutable except for {@code next}.
      */
-    static final class Node<K, V> {
+    static final class Node<K, V> implements ChainNode<Node<K, V>> {
 
         private final K key;
         private final V value;
+        private volatile Node<K, V> next;
 
-        private Node(K key, V value) {
+        private Node(K key, V value, Node<K, V> next) {
             this.key = key;
             this.value = value;
+            this.next = next;
+        }
+
+        @Override
+        public Node<K, V> getNext() {
+            return next;
+        }
+
+        @Override
+        public void setNext(Node<K, V> next) {
+            this.next = next;
         }
     }
 }

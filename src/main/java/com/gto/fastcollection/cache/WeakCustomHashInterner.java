@@ -1,10 +1,14 @@
 package com.gto.fastcollection.cache;
 
+import com.gto.fastcollection.Concurrents;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 
-import java.lang.ref.Reference;
+import java.util.Arrays;
+import java.util.concurrent.locks.StampedLock;
 import java.util.function.UnaryOperator;
+
+import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 
 /**
  * An {@link Interner} combining weak canonical instances (see
@@ -13,18 +17,26 @@ import java.util.function.UnaryOperator;
  * should be dropped once unused, and "equal" is decided by application logic.
  *
  * <p>Registered with {@link CacheCleaner} for periodic dead-entry sweeping.
- * Reads are lock-free; insertions compare-and-set on the slot value the probe
- * observed, and a lock is taken only to resize.
  */
-public final class WeakCustomHashInterner<T> extends OpenCacheTable<WeakReferenceNode<T>> implements Interner<T>, ICleanableCache {
+public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInterner.Segment<T>> implements Interner<T>, ICleanableCache {
 
     private final Hash.Strategy<? super T> strategy;
 
     /**
-     * Creates an interner with the given strategy; registers it with
-     * {@link CacheCleaner}.
+     * Creates an interner with default concurrency.
      */
     public WeakCustomHashInterner(Hash.Strategy<? super T> strategy) {
+        this(Concurrents.NCPU, strategy);
+    }
+
+    /**
+     * Creates an interner with the given concurrency level; registers it with
+     * {@link CacheCleaner}.
+     *
+     * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
+     */
+    public WeakCustomHashInterner(int concurrencyLevel, Hash.Strategy<? super T> strategy) {
+        super(concurrencyLevel, i -> new Segment<>(strategy));
         this.strategy = strategy;
         CacheCleaner.add(this);
     }
@@ -34,16 +46,16 @@ public final class WeakCustomHashInterner<T> extends OpenCacheTable<WeakReferenc
      */
     @Override
     public T intern(final T sample) {
-        final int hash = strategy.hashCode(sample);
-        final int mix = HashCommon.mix(hash);
-        return this.intern(sample, hash, mix, Interner.identityMappingFunction());
+        int hash = strategy.hashCode(sample);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).intern(sample, hash, mix, Interner.identityMappingFunction());
     }
 
     @Override
     public T intern(T sample, UnaryOperator<T> mappingFunction) {
-        final int hash = strategy.hashCode(sample);
-        final int mix = HashCommon.mix(hash);
-        return this.intern(sample, hash, mix, mappingFunction);
+        int hash = strategy.hashCode(sample);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).intern(sample, hash, mix, mappingFunction);
     }
 
     /**
@@ -51,9 +63,9 @@ public final class WeakCustomHashInterner<T> extends OpenCacheTable<WeakReferenc
      */
     @Override
     public boolean isPresent(final T sample) {
-        final int hash = strategy.hashCode(sample);
-        final int mix = HashCommon.mix(hash);
-        return this.lookup(sample, hash, mix) != null;
+        int hash = strategy.hashCode(sample);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).contains(sample, hash, mix);
     }
 
     /**
@@ -61,9 +73,17 @@ public final class WeakCustomHashInterner<T> extends OpenCacheTable<WeakReferenc
      */
     @Override
     public boolean addIfAbsent(final T sample) {
-        final int hash = strategy.hashCode(sample);
-        final int mix = HashCommon.mix(hash);
-        return this.insertIfAbsent(sample, hash, mix) == null;
+        int hash = strategy.hashCode(sample);
+        int mix = HashCommon.mix(hash);
+        return segmentFor(mix).add(sample, hash, mix);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void clear() {
+        clearSegments();
     }
 
     /**
@@ -71,121 +91,150 @@ public final class WeakCustomHashInterner<T> extends OpenCacheTable<WeakReferenc
      */
     @Override
     public void clearCache() {
-        sweep();
+        sweepSegments();
     }
 
     /**
-     * The table: an open-addressed slot array of {@link WeakReferenceNode}s
-     * (weak referent, stored hash, strategy-compared).
+     * A striped segment holding canonical instances as {@link WeakReferenceNode}s
+     * (weak referent, stored hash, strategy-compared) on the shared
+     * {@link HashSegment} skeleton. Dead nodes are removed in passing by
+     * writers and dropped in bulk by the inherited sweep; readers never mutate
+     * the chain.
      */
-    @Override
-    protected int hashOf(WeakReferenceNode<T> node) {
-        return HashCommon.mix(node.hash);
-    }
+    final static class Segment<T> extends HashSegment<WeakReferenceNode<T>> {
+        private final Hash.Strategy<? super T> strategy;
 
-    @Override
-    protected boolean isDead(WeakReferenceNode<T> node) {
-        return node.get() == null;
-    }
-
-    /**
-     * Read-only probe; returns the live canonical instance or {@code null}.
-     */
-    @SuppressWarnings("unchecked")
-    private T lookup(final T k, final int hash, final int mix) {
-        final Object[] tab = slots;
-        final int mask = tab.length - 1;
-        int index = mix & mask;
-        for (int steps = 0; steps <= mask; steps++, index = (index + 1) & mask) {
-            final Object raw = SLOT.getAcquire(tab, index);
-            if (raw == null) return null;
-            final WeakReferenceNode<T> node = (WeakReferenceNode<T>) raw;
-            final T key = node.get();
-            // collected nodes are skipped: a dead node earlier in the probe
-            // must not hide a live canonical instance behind it
-            if (key != null && node.hash == hash && (key == k || strategy.equals(k, key))) return key;
+        private Segment(Hash.Strategy<? super T> strategy) {
+            this.strategy = strategy;
         }
-        return null; // probe walked the whole table: treat as absent
-    }
 
-    /**
-     * Returns the canonical instance equal to {@code k}, inserting the mapped
-     * instance when none is interned yet; a mapping function returning
-     * {@code null} stores nothing and the call returns {@code null}.
-     */
-    private T intern(final T k, final int hash, final int mix, UnaryOperator<T> mappingFunction) {
-        final T existing = this.lookup(k, hash, mix);
-        if (existing != null) return existing;
-        final T v = mappingFunction.apply(k);
-        if (v == null) return null;
-        // The mapping function must preserve the sample's hash and equality (it is a
-        // canonicalisation such as a copy), so the miss above already rules out an equal
-        // instance and v can be probed and stored under the sample's hash: no second
-        // lookup is needed.
-        final T previous = this.insertIfAbsent(v, hash, mix);
-        return previous != null ? previous : v;
-    }
+        @Override
+        @SuppressWarnings("unchecked")
+        protected WeakReferenceNode<T>[] newArray(int capacity) {
+            return new WeakReferenceNode[capacity];
+        }
 
-    /**
-     * Inserts {@code k} unless an equal canonical instance is already bound,
-     * returning the instance already interned, or {@code null} when this call stored {@code k}. Holds the shared stamp, so writers
-     * stay parallel, and compare-and-sets into the first free slot of the probe
-     * sequence using the value the probe observed there, which may be a
-     * collected node whose slot is therefore reusable, so a competing writer
-     * makes the compare-and-set fail and the probe restart.
-     */
-    @SuppressWarnings("unchecked")
-    private T insertIfAbsent(final T k, final int hash, final int mix) {
-        for (; ; ) {
-            final long stamp = readLock();
-            boolean resize;
-            boolean done = false;
+        @Override
+        protected int nodeHash(WeakReferenceNode<T> node) {
+            return node.hash;
+        }
+
+        @Override
+        protected boolean isDead(WeakReferenceNode<T> node) {
+            return node.get() == null;
+        }
+
+        /**
+         * Lookup under the read lock; on a miss the canonical instance is stored under the write lock.
+         */
+        private T intern(final T k, final int hash, int mix, UnaryOperator<T> mappingFunction) {
+            long stamp = readLock();
             try {
-                final Object[] tab = slots;
-                final int mask = tab.length - 1;
-                int vacant = -1;
-                Object vacantValue = null;
-                int index = mix & mask;
-                for (int steps = 0; steps <= mask; steps++, index = (index + 1) & mask) {
-                    final Object raw = SLOT.getAcquire(tab, index);
-                    if (raw == null) {
-                        if (vacant < 0) {
-                            vacant = index;
-                            vacantValue = null;
-                        }
-                        break;
+                WeakReferenceNode<T> curr = table[mix & mask];
+                while (curr != null) {
+                    T key = curr.get();
+                    if (key != null && curr.hash == hash && (key == k || strategy.equals(k, key))) {
+                        return key;
                     }
-                    final WeakReferenceNode<T> node = (WeakReferenceNode<T>) raw;
-                    final T key = node.get();
-                    if (key == null) {
-                        // a collected entry is garbage: its slot is reusable
-                        if (vacant < 0) {
-                            vacant = index;
-                            vacantValue = node;
-                        }
-                        continue;
-                    }
-                    if (node.hash == hash && (key == k || strategy.equals(k, key))) return key;
-                }
-                if (vacant < 0) {
-                    // no free slot anywhere: the only case that grows before inserting
-                    resize = true;
-                } else {
-                    if (SLOT.compareAndSet(tab, vacant, vacantValue, new WeakReferenceNode<>(k, hash))) {
-                        // replacing a collected node keeps the entry count: it was still counted
-                        if (vacantValue == null) size++;
-                        Reference.reachabilityFence(k);
-                        done = true;
-                        resize = shouldGrow();
-                    } else {
-                        continue; // lost the slot to another writer: retry under a fresh stamp
-                    }
+                    curr = curr.next;
                 }
             } finally {
                 unlockRead(stamp);
             }
-            if (resize) grow();
-            if (done) return null;
+            final T v = mappingFunction.apply(k);
+            stamp = writeLock();
+            try {
+                final int index = mix & mask;
+                WeakReferenceNode<T> node = table[index];
+                WeakReferenceNode<T> prev = null;
+                WeakReferenceNode<T> curr = node;
+                while (curr != null) {
+                    T key = curr.get();
+                    if (key == null) {
+                        if (prev == null) {
+                            node = curr.next;
+                            table[index] = node;
+                        } else {
+                            prev.next = curr.next;
+                        }
+                        size--;
+                    } else {
+                        if (curr.hash == hash && (key == v || strategy.equals(v, key))) {
+                            return key;
+                        }
+                        prev = curr;
+                    }
+                    curr = curr.next;
+                }
+                table[index] = new WeakReferenceNode<>(v, hash, node);
+                if (++size > maxFill) {
+                    resize();
+                }
+                return v;
+            } finally {
+                unlockWrite(stamp);
+            }
+        }
+
+        /**
+         * Read-only membership test; never mutates the chain.
+         */
+        private boolean contains(final T k, final int hash, int mix) {
+            long stamp = readLock();
+            try {
+                final int index = mix & mask;
+                WeakReferenceNode<T> curr = table[index];
+                while (curr != null) {
+                    T key = curr.get();
+                    // collected nodes are skipped: a dead node earlier in the chain
+                    // must not hide a live canonical instance behind it
+                    if (key != null && curr.hash == hash && (key == k || strategy.equals(k, key))) {
+                        return true;
+                    }
+                    curr = curr.next;
+                }
+                return false;
+            } finally {
+                unlockRead(stamp);
+            }
+        }
+
+        /**
+         * Inserts only if absent, returning whether a new canonical instance was stored.
+         */
+        private boolean add(final T k, final int hash, int mix) {
+            long stamp = writeLock();
+            try {
+                final int index = mix & mask;
+                WeakReferenceNode<T> node = table[index];
+                WeakReferenceNode<T> prev = null;
+                WeakReferenceNode<T> curr = node;
+                while (curr != null) {
+                    T key = curr.get();
+                    if (key == null) {
+                        if (prev == null) {
+                            node = curr.next;
+                            table[index] = node;
+                        } else {
+                            prev.next = curr.next;
+                        }
+                        size--;
+                    } else {
+                        if (curr.hash == hash && (key == k || strategy.equals(k, key))) {
+                            return false;
+                        }
+                        prev = curr;
+                    }
+                    curr = curr.next;
+                }
+                table[index] = new WeakReferenceNode<>(k, hash, node);
+                if (++size > maxFill) {
+                    resize();
+                }
+                return true;
+            } finally {
+                unlockWrite(stamp);
+            }
         }
     }
 }

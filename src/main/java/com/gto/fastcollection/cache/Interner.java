@@ -35,15 +35,8 @@ public interface Interner<T> {
     /**
      * Like {@link #intern(Object)}, but inserts {@code mappingFunction.apply(sample)}
      * as the canonical instance when none equal is interned yet, instead of
-     * {@code sample} itself. Useful for storing a derived form as the canonical
-     * instance, e.g. a defensive copy or an interned-by-content equivalent.
-     *
-     * <p>The mapping function must preserve the sample's hash and equality: the
-     * mapped instance is probed and stored under the sample's hash, so it has to
-     * be equal to the sample (and hash like it). A mapping that changed either
-     * would file the entry where no later lookup of the sample could find it.
-     * The function runs outside every lock, so it may call back into this
-     * interner.
+     * {@code sample} itself. Useful for storing a derived (e.g. interned-by-content)
+     * form as the canonical instance.
      */
     T intern(final T sample, UnaryOperator<T> mappingFunction);
 

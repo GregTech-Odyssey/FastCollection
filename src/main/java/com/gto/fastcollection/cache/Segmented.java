@@ -1,4 +1,4 @@
-package com.gto.fastcollection.cache.legacy;
+package com.gto.fastcollection.cache;
 
 import java.util.function.IntFunction;
 

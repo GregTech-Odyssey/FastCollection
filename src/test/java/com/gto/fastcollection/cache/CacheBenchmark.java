@@ -37,13 +37,10 @@ import java.util.function.Function;
 public class CacheBenchmark {
 
     public enum Impl {
-        HASH, IDENTITY, CUSTOM, WEAK_VALUE_HASH, WEAK_VALUE_IDENTITY, WEAK_VALUE_CUSTOM,
-        LEGACY_IDENTITY, LEGACY_CUSTOM, LEGACY_WEAK_VALUE_HASH, LEGACY_WEAK_VALUE_IDENTITY, LEGACY_WEAK_VALUE_CUSTOM
+        HASH, IDENTITY, CUSTOM, WEAK_VALUE_HASH, WEAK_VALUE_IDENTITY, WEAK_VALUE_CUSTOM
     }
 
-    @Param({"HASH", "IDENTITY", "CUSTOM", "WEAK_VALUE_HASH", "WEAK_VALUE_IDENTITY", "WEAK_VALUE_CUSTOM",
-            "LEGACY_IDENTITY", "LEGACY_CUSTOM", "LEGACY_WEAK_VALUE_HASH", "LEGACY_WEAK_VALUE_IDENTITY",
-            "LEGACY_WEAK_VALUE_CUSTOM"})
+    @Param({"HASH", "IDENTITY", "CUSTOM", "WEAK_VALUE_HASH", "WEAK_VALUE_IDENTITY", "WEAK_VALUE_CUSTOM"})
     private Impl impl;
 
     /** Pre-filled entry count; must be a power of two so it doubles as a mask. */
@@ -94,23 +91,6 @@ public class CacheBenchmark {
                 break;
             case WEAK_VALUE_CUSTOM:
                 cache = new WeakValueCustomHashCache<>(VALUE_STRATEGY);
-                break;
-            // The pre-refactor (segmented StampedLock) implementations, kept under
-            // com.gto.fastcollection.cache.legacy so both designs stay comparable.
-            case LEGACY_IDENTITY:
-                cache = new com.gto.fastcollection.cache.legacy.IdentityHashCache<>();
-                break;
-            case LEGACY_CUSTOM:
-                cache = new com.gto.fastcollection.cache.legacy.CustomHashCache<>(VALUE_STRATEGY);
-                break;
-            case LEGACY_WEAK_VALUE_HASH:
-                cache = new com.gto.fastcollection.cache.legacy.WeakValueHashCache<>();
-                break;
-            case LEGACY_WEAK_VALUE_IDENTITY:
-                cache = new com.gto.fastcollection.cache.legacy.WeakValueIdentityHashCache<>();
-                break;
-            case LEGACY_WEAK_VALUE_CUSTOM:
-                cache = new com.gto.fastcollection.cache.legacy.WeakValueCustomHashCache<>(VALUE_STRATEGY);
                 break;
         }
         for (String k : keys) {

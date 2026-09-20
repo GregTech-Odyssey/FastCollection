@@ -270,8 +270,8 @@ public final class Enum2DoubleMap<K extends Enum<K>> extends AbstractReference2D
 
     /**
      * Adds {@code incr} to the value of {@code key} and stores the sum; an
-     * absent key starts from {@link #defRetValue} (zero by default). A sum of
-     * {@code 0D} removes the mapping (the zero-value sentinel).
+     * absent key starts from {@code 0D}. A sum of {@code 0D} removes the
+     * mapping (the zero-value sentinel).
      *
      * @return the previous value, or {@code defRetValue} if the key was absent
      */
@@ -279,10 +279,8 @@ public final class Enum2DoubleMap<K extends Enum<K>> extends AbstractReference2D
         int i = key.ordinal();
         double old = vals[i];
         if (old == 0D) {
-            // an absent key starts from defRetValue, exactly like getDouble(key) reports
-            double sum = defRetValue + incr;
-            if (sum == 0D) return defRetValue;
-            vals[i] = sum;
+            if (incr == 0D) return defRetValue;
+            vals[i] = incr;
             size++;
             return defRetValue;
         }

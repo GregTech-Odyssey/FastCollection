@@ -1,39 +1,60 @@
 package com.gto.fastcollection.cache.primitive;
 
-import com.gto.fastcollection.cache.OpenCacheTable;
+import com.gto.fastcollection.Concurrents;
+import com.gto.fastcollection.cache.ChainNode;
+import com.gto.fastcollection.cache.HashSegment;
+import com.gto.fastcollection.cache.Segmented;
 import it.unimi.dsi.fastutil.HashCommon;
-
 import java.util.function.LongFunction;
 
 /**
- * A concurrent cache from primitive {@code long} keys to strong object values.
- * Keys are mixed with {@link HashCommon#mix} and compared by value; the mixed
- * hash is computed once per call and threaded down to the probe.
+ * A segmented concurrent cache from primitive {@code long} keys to strong
+ * object values. Keys are mixed with {@link HashCommon#mix} and compared by
+ * value. Concurrency mirrors the object
+ * caches: power-of-two segments, each guarded by a {@link java.util.concurrent.locks.StampedLock}.
  *
- * <p>{@link #getCache(int)} / {@link #getCache(int, LongFunction)} run the
- * create function outside every lock so it may call back into this cache, then
- * insert with compare-and-set; a lock is taken only to resize. A function
- * returning {@code null} stores nothing.
+ * <p>{@link #getCache(long)} / {@link #getCache(long, LongFunction)} run the
+ * create function outside every lock so it may call back into this cache;
+ * concurrent computations of the same key are merged under the write lock.
  *
  * @param <V> the value type
  */
-public final class LongCache<V> extends OpenCacheTable<LongCache.Node<V>> {
+public final class LongCache<V> extends Segmented<LongCache.Segment<V>> {
 
     private final LongFunction<? extends V> createFunction;
 
-
     /**
-     * Creates a cache with no default create function.
+     * Creates a cache with default concurrency and no default create function.
      */
     public LongCache() {
-        this.createFunction = null;
+        this(Concurrents.NCPU, null);
     }
 
     /**
-     * Creates a cache with the given default create function; {@code null} is
-     * allowed and behaves like the no-factory constructor.
+     * Creates a cache with default concurrency and the given default create
+     * function; {@code null} is allowed and behaves like the no-factory
+     * constructor.
      */
     public LongCache(LongFunction<? extends V> createFunction) {
+        this(Concurrents.NCPU, createFunction);
+    }
+
+    /**
+     * Creates a cache with the given concurrency level and no default create function.
+     *
+     * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
+     */
+    public LongCache(int concurrencyLevel) {
+        this(concurrencyLevel, null);
+    }
+
+    /**
+     * Creates a cache with the given concurrency level and default create function.
+     *
+     * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
+     */
+    public LongCache(int concurrencyLevel, LongFunction<? extends V> createFunction) {
+        super(concurrencyLevel, i -> new Segment<>());
         this.createFunction = createFunction;
     }
 
@@ -42,145 +63,178 @@ public final class LongCache<V> extends OpenCacheTable<LongCache.Node<V>> {
      * create function if absent. The create function must be non-null.
      */
     public V getCache(final long k) {
-        return getCache(k, HashCommon.mix(Long.hashCode(k)), createFunction);
+        int mix = HashCommon.mix(Long.hashCode(k));
+        return segmentFor(mix).getCache(k, mix, createFunction);
     }
 
     /**
      * Returns the cached value for {@code k}, computing it with
-     * {@code createFunction} if absent. The function runs outside every lock.
+     * {@code createFunction} if absent. The function runs outside every lock
+     * so it may recursively call back into this cache.
      */
     public V getCache(final long k, LongFunction<? extends V> createFunction) {
-        return getCache(k, HashCommon.mix(Long.hashCode(k)), createFunction);
+        int mix = HashCommon.mix(Long.hashCode(k));
+        return segmentFor(mix).getCache(k, mix, createFunction);
     }
 
     /**
      * Returns the value bound to {@code k}, or {@code null} if absent.
      */
     public V getIfPresent(final long k) {
-        return getIfAbsent(k, HashCommon.mix(Long.hashCode(k)));
+        int mix = HashCommon.mix(Long.hashCode(k));
+        return segmentFor(mix).getIfAbsent(k, mix);
     }
 
     /**
      * Inserts {@code v} only if {@code k} is absent; returns the value now bound.
      */
     public V putIfAbsent(final long k, final V v) {
-        return putIfAbsent(k, v, HashCommon.mix(Long.hashCode(k)));
+        int mix = HashCommon.mix(Long.hashCode(k));
+        return segmentFor(mix).put(k, v, mix);
     }
 
     /**
-     * The table: an open-addressed slot array of {@link Node}s, primitive keys
-     * compared by value, nodes storing no hash so a resize re-derives it.
+     * Removes every entry.
      */
-
-    @Override
-    protected int hashOf(Node<V> node) {
-        return HashCommon.mix(Long.hashCode(node.key));
-    }
-
-    @Override
-    protected boolean isDead(Node<V> node) {
-        return false;
+    public void clear() {
+        clearSegments();
     }
 
     /**
-     * Read-only lookup; never stores anything.
+     * A striped segment: an independently locked separate-chaining hash table
+     * on the shared {@link HashSegment} skeleton; primitive keys compared by
+     * value, nodes store no separate hash so resizing re-derives it via
+     * {@link #nodeHash}.
      */
-    @SuppressWarnings("unchecked")
-    private V getIfAbsent(final long k, final int mix) {
-        final Object[] tab = slots;
-        final int mask = tab.length - 1;
-        int index = mix & mask;
-        for (int steps = 0; steps <= mask; steps++, index = (index + 1) & mask) {
-            final Object raw = SLOT.getAcquire(tab, index);
-            if (raw == null) return null;
-            final Node<V> node = (Node<V>) raw;
-            if (node.key == k) return node.value;
+    static final class Segment<V> extends HashSegment<Node<V>> {
+
+        private Segment() {
         }
-        return null; // probe walked the whole table: treat as absent
-    }
 
-    /**
-     * Probes without locking, runs the function outside every lock, then
-     * inserts with compare-and-set; a function returning {@code null} stores
-     * nothing.
-     */
-    private V getCache(final long k, final int mix, LongFunction<? extends V> createFunction) {
-        final Object[] tab = slots;
-        final int mask = tab.length - 1;
-        int index = mix & mask;
-        for (int steps = 0; steps <= mask; steps++, index = (index + 1) & mask) {
-            final Object raw = SLOT.getAcquire(tab, index);
-            if (raw == null) break;
-            @SuppressWarnings("unchecked") final Node<V> node = (Node<V>) raw;
-            if (node.key == k) return node.value;
+        @Override
+        @SuppressWarnings("unchecked")
+        protected Node<V>[] newArray(int capacity) {
+            return new Node[capacity];
         }
-        // Run outside every lock so the function may call back into this cache.
-        final V value = createFunction.apply(k);
-        if (value == null) return null;
-        return putIfAbsent(k, value, mix);
-    }
 
-    /**
-     * Inserts unless the key is already bound; returns the value now bound.
-     * The compare-and-set uses the slot value the probe observed, so a
-     * competing writer makes it fail and the probe restart.
-     */
-    @SuppressWarnings("unchecked")
-    private V putIfAbsent(final long k, final V v, final int mix) {
-        if (v == null) return null;
-        for (; ; ) {
-            final long stamp = readLock();
-            boolean resize;
-            boolean done = false;
+        @Override
+        protected int nodeHash(Node<V> node) {
+            return Long.hashCode(node.key);
+        }
+
+        @Override
+        protected boolean isDead(Node<V> node) {
+            return false;
+        }
+
+        /**
+         * Probes under the read lock, runs the function with every lock released
+         * so it may call back into this cache, and finally stores the result
+         * under the write lock, keeping another thread's value if it landed first.
+         */
+        private V getCache(final long k, final int mix, LongFunction<? extends V> createFunction) {
+            long stamp = readLock();
             try {
-                final Object[] tab = slots;
-                final int mask = tab.length - 1;
-                int vacant = -1;
-                Object vacantValue = null;
-                int index = mix & mask;
-                for (int steps = 0; steps <= mask; steps++, index = (index + 1) & mask) {
-                    final Object raw = SLOT.getAcquire(tab, index);
-                    if (raw == null) {
-                        if (vacant < 0) {
-                            vacant = index;
-                            vacantValue = null;
-                        }
-                        break;
+                Node<V> curr = table[mix & mask];
+                while (curr != null) {
+                    if (curr.key == k) {
+                        return curr.value;
                     }
-                    final Node<V> node = (Node<V>) raw;
-                    if (node.key == k) return node.value;
-                }
-                if (vacant < 0) {
-                    // no free slot anywhere: the only case that grows before inserting
-                    resize = true;
-                } else {
-                    if (SLOT.compareAndSet(tab, vacant, vacantValue, new Node<>(k, v))) {
-                        size++;
-                        done = true;
-                        resize = shouldGrow();
-                    } else {
-                        continue; // lost the slot to another writer: retry under a fresh stamp
-                    }
+                    curr = curr.next;
                 }
             } finally {
                 unlockRead(stamp);
             }
-            if (resize) grow();
-            if (done) return v;
+            // Run outside all locks so the function may call back into this cache.
+            final var v = createFunction.apply(k);
+            stamp = writeLock();
+            try {
+                final int index = mix & mask;
+                Node<V> curr = table[index];
+                while (curr != null) {
+                    if (curr.key == k) {
+                        return curr.value;
+                    }
+                    curr = curr.next;
+                }
+                table[index] = new Node<>(k, v, table[index]);
+                if (++size > maxFill) {
+                    resize();
+                }
+                return v;
+            } finally {
+                unlockWrite(stamp);
+            }
+        }
+
+        /**
+         * Read-only lookup; never stores anything.
+         */
+        private V getIfAbsent(final long k, final int mix) {
+            long stamp = readLock();
+            try {
+                Node<V> curr = table[mix & mask];
+                while (curr != null) {
+                    if (curr.key == k) {
+                        return curr.value;
+                    }
+                    curr = curr.next;
+                }
+                return null;
+            } finally {
+                unlockRead(stamp);
+            }
+        }
+
+        /**
+         * Inserts only if absent; returns the value now bound to the key.
+         */
+        private V put(final long k, final V v, final int mix) {
+            long stamp = writeLock();
+            try {
+                final int index = mix & mask;
+                final Node<V> node = table[index];
+                Node<V> curr = node;
+                while (curr != null) {
+                    if (curr.key == k) {
+                        return curr.value;
+                    }
+                    curr = curr.next;
+                }
+                table[index] = new Node<>(k, v, node);
+                if (++size > maxFill) {
+                    resize();
+                }
+                return v;
+            } finally {
+                unlockWrite(stamp);
+            }
         }
     }
 
     /**
-     * A single slot entry; immu
+     * A single entry in a chain; immutable except for {@code next}.
      */
-    static final class Node<V> {
+    static final class Node<V> implements ChainNode<Node<V>> {
 
         private final long key;
         private final V value;
+        private volatile Node<V> next;
 
-        private Node(long key, V value) {
+        private Node(long key, V value, Node<V> next) {
             this.key = key;
             this.value = value;
+            this.next = next;
+        }
+
+        @Override
+        public Node<V> getNext() {
+            return next;
+        }
+
+        @Override
+        public void setNext(Node<V> next) {
+            this.next = next;
         }
     }
 }

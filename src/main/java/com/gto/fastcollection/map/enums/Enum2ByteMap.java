@@ -277,8 +277,8 @@ public final class Enum2ByteMap<K extends Enum<K>> extends AbstractReference2Byt
 
     /**
      * Adds {@code incr} to the value of {@code key} and stores the sum; an
-     * absent key starts from {@link #defRetValue} (zero by default). A sum of
-     * {@code (byte) 0} removes the mapping (the zero-value sentinel).
+     * absent key starts from {@code (byte) 0}. A sum of {@code (byte) 0} removes the
+     * mapping (the zero-value sentinel).
      *
      * @return the previous value, or {@code defRetValue} if the key was absent
      */
@@ -286,10 +286,8 @@ public final class Enum2ByteMap<K extends Enum<K>> extends AbstractReference2Byt
         int i = key.ordinal();
         byte old = vals[i];
         if (old == (byte) 0) {
-            // an absent key starts from defRetValue, exactly like getByte(key) reports
-            byte sum = (byte) (defRetValue + incr);
-            if (sum == (byte) 0) return defRetValue;
-            vals[i] = sum;
+            if (incr == (byte) 0) return defRetValue;
+            vals[i] = incr;
             size++;
             return defRetValue;
         }

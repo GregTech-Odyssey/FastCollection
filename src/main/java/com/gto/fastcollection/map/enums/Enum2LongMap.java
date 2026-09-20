@@ -269,8 +269,8 @@ public final class Enum2LongMap<K extends Enum<K>> extends AbstractReference2Lon
 
     /**
      * Adds {@code incr} to the value of {@code key} and stores the sum; an
-     * absent key starts from {@link #defRetValue} (zero by default). A sum of
-     * {@code 0L} removes the mapping (the zero-value sentinel).
+     * absent key starts from {@code 0L}. A sum of {@code 0L} removes the
+     * mapping (the zero-value sentinel).
      *
      * @return the previous value, or {@code defRetValue} if the key was absent
      */
@@ -278,10 +278,8 @@ public final class Enum2LongMap<K extends Enum<K>> extends AbstractReference2Lon
         int i = key.ordinal();
         long old = vals[i];
         if (old == 0L) {
-            // an absent key starts from defRetValue, exactly like getLong(key) reports
-            long sum = defRetValue + incr;
-            if (sum == 0L) return defRetValue;
-            vals[i] = sum;
+            if (incr == 0L) return defRetValue;
+            vals[i] = incr;
             size++;
             return defRetValue;
         }
