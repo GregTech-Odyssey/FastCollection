@@ -269,8 +269,8 @@ public final class Enum2IntMap<K extends Enum<K>> extends AbstractReference2IntM
 
     /**
      * Adds {@code incr} to the value of {@code key} and stores the sum; an
-     * absent key starts from {@code 0}. A sum of {@code 0} removes the
-     * mapping (the zero-value sentinel).
+     * absent key starts from {@link #defRetValue} (zero by default). A sum of
+     * {@code 0} removes the mapping (the zero-value sentinel).
      *
      * @return the previous value, or {@code defRetValue} if the key was absent
      */
@@ -278,8 +278,10 @@ public final class Enum2IntMap<K extends Enum<K>> extends AbstractReference2IntM
         int i = key.ordinal();
         int old = vals[i];
         if (old == 0) {
-            if (incr == 0) return defRetValue;
-            vals[i] = incr;
+            // an absent key starts from defRetValue, exactly like getInt(key) reports
+            int sum = defRetValue + incr;
+            if (sum == 0) return defRetValue;
+            vals[i] = sum;
             size++;
             return defRetValue;
         }

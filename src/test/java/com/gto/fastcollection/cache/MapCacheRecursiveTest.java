@@ -64,34 +64,6 @@ class MapCacheRecursiveTest {
         assertThat(cache.getIfPresent("parent")).isEqualTo("root");
         assertThat(cache.getIfPresent("child")).isEqualTo("root-child");
     }
-    /** Single-segment variants: recursive keys necessarily share the one segment. */
-    static Stream<Arguments> singleSegmentCaches() {
-        return Stream.of(
-                Arguments.of("HashCache", (Supplier<MapCache<String, String>>) HashCache::new),
-                Arguments.of("IdentityHashCache", (Supplier<MapCache<String, String>>) () -> new IdentityHashCache<>(1)),
-                Arguments.of("CustomHashCache",
-                        (Supplier<MapCache<String, String>>) () -> new CustomHashCache<>(VALUE_STRATEGY, 1)),
-                Arguments.of("WeakValueHashCache", (Supplier<MapCache<String, String>>) () -> new WeakValueHashCache<>(1)),
-                Arguments.of("WeakValueIdentityHashCache",
-                        (Supplier<MapCache<String, String>>) () -> new WeakValueIdentityHashCache<>(1)),
-                Arguments.of("WeakValueCustomHashCache",
-                        (Supplier<MapCache<String, String>>) () -> new WeakValueCustomHashCache<>(VALUE_STRATEGY, 1)));
-    }
-    @ParameterizedTest(name = "{0} [single segment]")
-    @MethodSource("singleSegmentCaches")
-    @Timeout(value = 30, unit = TimeUnit.SECONDS)
-    void recursiveResolvesDependenciesWhenKeysShareOneSegment(String name, Supplier<MapCache<String, String>> factory) {
-        MapCache<String, String> cache = factory.get();
-        // with a single segment the inner call necessarily re-enters the segment
-        // the outer computation is running in, so the function must never hold a lock
-        String child = cache.getCacheRecursive("child", k -> {
-            String parent = cache.getCacheRecursive("parent", kk -> "root");
-            return parent + "-child";
-        });
-        assertThat(child).isEqualTo("root-child");
-        assertThat(cache.getIfPresent("parent")).isEqualTo("root");
-        assertThat(cache.getIfPresent("child")).isEqualTo("root-child");
-    }
     @ParameterizedTest(name = "{0}")
     @MethodSource("caches")
     void recursiveReusesCachedValueWithoutRerunning(String name, Supplier<MapCache<String, String>> factory) {

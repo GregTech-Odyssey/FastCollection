@@ -1,57 +1,38 @@
 package com.gto.fastcollection.cache;
 
-import com.gto.fastcollection.Concurrents;
-import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 
+import java.lang.ref.Reference;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 /**
- * A {@link MapCache} whose values are held by {@link java.lang.ref.WeakReference}
- * (keys stay strong). A value is automatically removed once it is garbage
- * collected, so the cache can hold objects that would otherwise be expensive to
- * keep alive for the caller's lifetime (e.g. derived data, one-off resources)
- * without leaking them.
+ * A {@link MapCache} whose values are held weakly and whose keys are compared
+ * by {@code equals}/{@code hashCode}: the weak-value counterpart of
+ * {@link IdentityHashCache}.
  *
- * <p>Because values are weak, "present" and "absent" are time-dependent: a value
- * may disappear between two calls once it is collected. Dead entries are pruned
- * eagerly on writes (a write to a collected key reuses the node) and lazily by
- * {@link CacheCleaner} through {@link #clearCache()}.
- *
- * <p>Concurrency mirrors {@link CustomHashCache}: power-of-two segments, each
- * guarded by a {@link StampedLock}; reads take the shared read lock and writes
- * the exclusive write lock.
+ * <p>Registered with {@link CacheCleaner} for periodic dead-entry sweeping.
+ * Concurrency mirrors {@link IdentityHashCache}: one open-addressed table,
+ * lock-free reads and lock-free compare-and-set writes, a lock only to resize;
+ * every insertion compare-and-sets on the slot value its probe observed, so a
  */
-public final class WeakValueHashCache<K, V> extends Segmented<WeakValueHashCache.Segment<K, V>> implements MapCache<K, V>, ICleanableCache {
+public final class WeakValueHashCache<K, V> extends OpenCacheTable<WeakReferenceValueNode<K, V>> implements MapCache<K, V>, ICleanableCache {
 
     private final Function<? super K, ? extends V> createFunction;
 
+    /**
+     * Creates a cache with no default create function.
+     */
     public WeakValueHashCache() {
-        this(Concurrents.NCPU, null);
+        this.createFunction = null;
+        CacheCleaner.add(this);
     }
 
     /**
-     * Creates a cache with default concurrency and the given default create
-     * function; {@code null} is allowed and behaves like the no-factory
-     * constructor.
+     * Creates a cache with the given default create function; {@code null} is
+     * allowed and behaves like the no-factory constructor.
      */
     public WeakValueHashCache(Function<? super K, ? extends V> createFunction) {
-        this(Concurrents.NCPU, createFunction);
-    }
-
-    public WeakValueHashCache(int concurrencyLevel) {
-        this(concurrencyLevel, null);
-    }
-
-    /**
-     * Creates a cache with the given concurrency level and default create function;
-     * registers this cache with {@link CacheCleaner}.
-     *
-     * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
-     */
-    public WeakValueHashCache(int concurrencyLevel, Function<? super K, ? extends V> createFunction) {
-        super(concurrencyLevel, i -> new Segment<>());
         this.createFunction = createFunction;
         CacheCleaner.add(this);
     }
@@ -63,30 +44,22 @@ public final class WeakValueHashCache<K, V> extends Segmented<WeakValueHashCache
 
     @Override
     public V getCache(final K k, Function<? super K, ? extends V> createFunction) {
-        int hash = k.hashCode();
-        int mix = HashCommon.mix(hash);
-        return segmentFor(mix).getCache(k, hash, mix, createFunction, Interner.identityMappingFunction());
+        return getCache(k, k.hashCode(), createFunction, Interner.identityMappingFunction());
     }
 
     @Override
     public V getCache(K k, Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction) {
-        int hash = k.hashCode();
-        int mix = HashCommon.mix(hash);
-        return segmentFor(mix).getCache(k, hash, mix, createFunction, keyMappingFunction);
+        return getCache(k, k.hashCode(), createFunction, keyMappingFunction);
     }
 
     @Override
     public V getCacheRecursive(final K k, Function<? super K, ? extends V> createFunction) {
-        int hash = k.hashCode();
-        int mix = HashCommon.mix(hash);
-        return segmentFor(mix).getCache(k, hash, mix, createFunction, Interner.identityMappingFunction());
+        return getCache(k, k.hashCode(), createFunction, Interner.identityMappingFunction());
     }
 
     @Override
     public V getCacheRecursive(final K k, Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction) {
-        int hash = k.hashCode();
-        int mix = HashCommon.mix(hash);
-        return segmentFor(mix).getCache(k, hash, mix, createFunction, keyMappingFunction);
+        return getCache(k, k.hashCode(), createFunction, keyMappingFunction);
     }
 
     /**
@@ -94,9 +67,7 @@ public final class WeakValueHashCache<K, V> extends Segmented<WeakValueHashCache
      */
     @Override
     public V getIfPresent(final K k) {
-        int hash = k.hashCode();
-        int mix = HashCommon.mix(hash);
-        return segmentFor(mix).getIfAbsent(k, hash, mix);
+        return getIfAbsent(k, k.hashCode());
     }
 
     /**
@@ -104,17 +75,7 @@ public final class WeakValueHashCache<K, V> extends Segmented<WeakValueHashCache
      */
     @Override
     public V putIfAbsent(final K k, final V v) {
-        int hash = k.hashCode();
-        int mix = HashCommon.mix(hash);
-        return segmentFor(mix).put(k, v, hash, mix);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void clear() {
-        clearSegments();
+        return putIfAbsent(k, v, k.hashCode());
     }
 
     /**
@@ -122,151 +83,133 @@ public final class WeakValueHashCache<K, V> extends Segmented<WeakValueHashCache
      */
     @Override
     public void clearCache() {
-        sweepSegments();
+        sweep();
     }
 
     /**
-     * A striped segment whose entries hold {@link WeakReferenceValueNode}s (weak
-     * value, strong key) on the shared {@link HashSegment} skeleton. A node
-     * whose value has been collected is dead: writers replace it in place when
-     * they hit it, and the inherited sweep drops it in bulk. Readers never
-     * mutate the chain, so the shared read lock stays a pure read.
+     * The table: an open-addressed slot array of {@link WeakReferenceValueNode}s
+     * (weak value, strong key) whose nodes carry the key's
+     * hash.
      */
-    final static class Segment<K, V> extends HashSegment<WeakReferenceValueNode<K, V>> {
 
-        private Segment() {
+    @Override
+    protected int hashOf(WeakReferenceValueNode<K, V> node) {
+        return HashCommon.mix(node.hash);
+    }
+
+    @Override
+    protected boolean isDead(WeakReferenceValueNode<K, V> node) {
+        return node.get() == null;
+    }
+
+    /**
+     * Read-only lookup; never stores anything.
+     */
+    @SuppressWarnings("unchecked")
+    private V getIfAbsent(final K k, final int hash) {
+        final int mix = HashCommon.mix(hash);
+        final Object[] tab = slots;
+        final int mask = tab.length - 1;
+        int index = mix & mask;
+        for (int steps = 0; steps <= mask; steps++, index = (index + 1) & mask) {
+            final Object raw = SLOT.getAcquire(tab, index);
+            if (raw == null) return null;
+            final WeakReferenceValueNode<K, V> node = (WeakReferenceValueNode<K, V>) raw;
+            if (node.hash == hash && (k == node.key || k.equals(node.key))) return node.get();
         }
+        return null; // probe walked the whole table: treat as absent
+    }
 
-        @Override
-        @SuppressWarnings("unchecked")
-        protected WeakReferenceValueNode<K, V>[] newArray(int capacity) {
-            return new WeakReferenceValueNode[capacity];
+    /**
+     * Recursive variant: probes without locking, runs the function with
+     * every lock released so it may call back into this cache, then inserts
+     * with compare-and-set, keeping the value computed by another thread if
+     * one landed first. A function returning {@code null} stores nothing.
+     */
+    private V getCache(final K k, final int hash,
+                       Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction) {
+        final int mix = HashCommon.mix(hash);
+        final Object[] tab = slots;
+        final int mask = tab.length - 1;
+        int index = mix & mask;
+        for (int steps = 0; steps <= mask; steps++, index = (index + 1) & mask) {
+            final Object raw = SLOT.getAcquire(tab, index);
+            if (raw == null) break;
+            @SuppressWarnings("unchecked") final WeakReferenceValueNode<K, V> node = (WeakReferenceValueNode<K, V>) raw;
+            if (node.hash == hash && (k == node.key || k.equals(node.key))) {
+                final V existing = node.get();
+                if (existing != null) return existing;
+                break;
+            }
         }
+        // Run outside every lock so the function may call back into this cache.
+        final K mapped = keyMappingFunction.apply(k);
+        final V value = createFunction.apply(mapped);
+        if (value == null) return null;
+        return putIfAbsent(mapped, value, hash);
+    }
 
-        @Override
-        protected int nodeHash(WeakReferenceValueNode<K, V> node) {
-            return node.hash;
-        }
-
-        @Override
-        protected boolean isDead(WeakReferenceValueNode<K, V> node) {
-            return node.get() == null;
-        }
-
-        /**
-         * Recursive variant: probes under the read lock, runs the function with
-         * every lock released so it may call back into this cache, and finally
-         * stores the result under the write lock — replacing a dead node if one
-         * occupies the slot, or keeping another thread's value if it landed
-         * first.
-         */
-        private V getCache(final K k, final int hash, int mix,
-                           Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction) {
-            long stamp = readLock();
+    /**
+     * Inserts unless the key is bound to a live value; returns the value now
+     * bound. Lock-free: the node is compare-and-set into the first free slot
+     * of the probe sequence, and any conflict (a slot taken meanwhile, or an
+     * array replaced by a resize) restarts the probe on the current array.
+     */
+    @SuppressWarnings("unchecked")
+    private V putIfAbsent(final K k, final V v, final int hash) {
+        if (v == null) return null;
+        final int mix = HashCommon.mix(hash);
+        for (; ; ) {
+            final long stamp = readLock();
+            boolean resize;
+            boolean done = false;
             try {
-                WeakReferenceValueNode<K, V> curr = table[mix & mask];
-                while (curr != null) {
-                    if (curr.hash == hash && (curr.key == k || k.equals(curr.key))) {
-                        V v = curr.get();
-                        if (v != null) return v;
+                final Object[] tab = slots;
+                final int mask = tab.length - 1;
+                int vacant = -1;
+                Object vacantValue = null;
+                int index = mix & mask;
+                for (int steps = 0; steps <= mask; steps++, index = (index + 1) & mask) {
+                    final Object raw = SLOT.getAcquire(tab, index);
+                    if (raw == null) {
+                        if (vacant < 0) {
+                            vacant = index;
+                            vacantValue = null;
+                        }
                         break;
                     }
-                    curr = curr.next;
+                    final WeakReferenceValueNode<K, V> node = (WeakReferenceValueNode<K, V>) raw;
+                    if (node.hash == hash && (k == node.key || k.equals(node.key))) {
+                        final V existing = node.get();
+                        if (existing != null) return existing;
+                        // a collected entry is garbage: its slot is reusable
+                        if (vacant < 0) {
+                            vacant = index;
+                            vacantValue = node;
+                        }
+                    }
+                }
+                if (vacant < 0) {
+                    // no free slot anywhere: the only case that grows before inserting
+                    resize = true;
+                } else {
+                    if (SLOT.compareAndSet(tab, vacant, vacantValue, new WeakReferenceValueNode<>(k, v, hash))) {
+                        if (vacantValue == null) {
+                            size++;
+                        }
+                        Reference.reachabilityFence(k);
+                        Reference.reachabilityFence(v);
+                        done = true;
+                        resize = shouldGrow();
+                    } else {
+                        continue; // lost the slot to another writer: retry under a fresh stamp
+                    }
                 }
             } finally {
                 unlockRead(stamp);
             }
-            // Run outside all locks so the function may call back into this cache.
-            final var mapped = keyMappingFunction.apply(k);
-            final var v = createFunction.apply(mapped);
-            stamp = writeLock();
-            try {
-                final int index = mix & mask;
-                final WeakReferenceValueNode<K, V> node = table[index];
-                WeakReferenceValueNode<K, V> prev = null;
-                WeakReferenceValueNode<K, V> curr = node;
-                while (curr != null) {
-                    if (curr.hash == hash && (curr.key == mapped || mapped.equals(curr.key))) {
-                        V existing = curr.get();
-                        if (existing != null) {
-                            return existing;
-                        }
-                        // value was collected: replace the dead node with the computed value
-                        var n = new WeakReferenceValueNode<>(mapped, v, hash, curr.next);
-                        if (prev == null) {
-                            table[index] = n;
-                        } else {
-                            prev.next = n;
-                        }
-                        return v;
-                    }
-                    prev = curr;
-                    curr = curr.next;
-                }
-                table[index] = new WeakReferenceValueNode<>(mapped, v, hash, node);
-                if (++size > maxFill) {
-                    resize();
-                }
-                return v;
-            } finally {
-                unlockWrite(stamp);
-            }
-        }
-
-        /**
-         * Read-only lookup; never mutates the chain.
-         */
-        private V getIfAbsent(final K k, final int hash, int mix) {
-            long stamp = readLock();
-            try {
-                final int index = mix & mask;
-                WeakReferenceValueNode<K, V> curr = table[index];
-                while (curr != null) {
-                    if (curr.hash == hash && (curr.key == k || k.equals(curr.key))) {
-                        return curr.get();
-                    }
-                    curr = curr.next;
-                }
-                return null;
-            } finally {
-                unlockRead(stamp);
-            }
-        }
-
-        /**
-         * Inserts only if absent, replacing a dead node; returns the value now bound.
-         */
-        private V put(final K k, final V v, final int hash, int mix) {
-            long stamp = writeLock();
-            try {
-                final int index = mix & mask;
-                final WeakReferenceValueNode<K, V> node = table[index];
-                WeakReferenceValueNode<K, V> prev = null;
-                WeakReferenceValueNode<K, V> curr = node;
-                while (curr != null) {
-                    if (curr.hash == hash && (curr.key == k || k.equals(curr.key))) {
-                        V old = curr.get();
-                        if (old != null) return old;
-                        // value was collected: replace the dead node with the new value
-                        var n = new WeakReferenceValueNode<>(k, v, hash, curr.next);
-                        if (prev == null) {
-                            table[index] = n;
-                        } else {
-                            prev.next = n;
-                        }
-                        return v;
-                    }
-                    prev = curr;
-                    curr = curr.next;
-                }
-                table[index] = new WeakReferenceValueNode<>(k, v, hash, node);
-                if (++size > maxFill) {
-                    resize();
-                }
-                return v;
-            } finally {
-                unlockWrite(stamp);
-            }
+            if (resize) grow();
+            if (done) return v;
         }
     }
 }

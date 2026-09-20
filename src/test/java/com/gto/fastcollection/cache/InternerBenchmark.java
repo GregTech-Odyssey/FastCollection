@@ -33,10 +33,10 @@ import java.util.concurrent.TimeUnit;
 public class InternerBenchmark {
 
     public enum Impl {
-        HASH, CUSTOM, WEAK_HASH, WEAK_CUSTOM
+        HASH, CUSTOM, WEAK_HASH, WEAK_CUSTOM, LEGACY_CUSTOM, LEGACY_WEAK_HASH, LEGACY_WEAK_CUSTOM
     }
 
-    @Param({"HASH", "CUSTOM", "WEAK_HASH", "WEAK_CUSTOM"})
+    @Param({"HASH", "CUSTOM", "WEAK_HASH", "WEAK_CUSTOM", "LEGACY_CUSTOM", "LEGACY_WEAK_HASH", "LEGACY_WEAK_CUSTOM"})
     private Impl impl;
 
     /** Pre-filled entry count; must be a power of two so it doubles as a mask. */
@@ -78,6 +78,17 @@ public class InternerBenchmark {
                 break;
             case WEAK_CUSTOM:
                 interner = new WeakCustomHashInterner<>(VALUE_STRATEGY);
+                break;
+            // The pre-refactor (segmented StampedLock) implementations, kept under
+            // com.gto.fastcollection.cache.legacy so both designs stay comparable.
+            case LEGACY_CUSTOM:
+                interner = new com.gto.fastcollection.cache.legacy.CustomHashInterner<>(VALUE_STRATEGY);
+                break;
+            case LEGACY_WEAK_HASH:
+                interner = new com.gto.fastcollection.cache.legacy.WeakHashInterner<>();
+                break;
+            case LEGACY_WEAK_CUSTOM:
+                interner = new com.gto.fastcollection.cache.legacy.WeakCustomHashInterner<>(VALUE_STRATEGY);
                 break;
         }
         for (String s : samples) {

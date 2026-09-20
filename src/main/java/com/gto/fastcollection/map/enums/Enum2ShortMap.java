@@ -270,8 +270,8 @@ public final class Enum2ShortMap<K extends Enum<K>> extends AbstractReference2Sh
 
     /**
      * Adds {@code incr} to the value of {@code key} and stores the sum; an
-     * absent key starts from {@code (short) 0}. A sum of {@code (short) 0} removes the
-     * mapping (the zero-value sentinel).
+     * absent key starts from {@link #defRetValue} (zero by default). A sum of
+     * {@code (short) 0} removes the mapping (the zero-value sentinel).
      *
      * @return the previous value, or {@code defRetValue} if the key was absent
      */
@@ -279,8 +279,10 @@ public final class Enum2ShortMap<K extends Enum<K>> extends AbstractReference2Sh
         int i = key.ordinal();
         short old = vals[i];
         if (old == (short) 0) {
-            if (incr == (short) 0) return defRetValue;
-            vals[i] = incr;
+            // an absent key starts from defRetValue, exactly like getShort(key) reports
+            short sum = (short) (defRetValue + incr);
+            if (sum == (short) 0) return defRetValue;
+            vals[i] = sum;
             size++;
             return defRetValue;
         }

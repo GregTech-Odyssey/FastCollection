@@ -1,4 +1,4 @@
-package com.gto.fastcollection.cache;
+package com.gto.fastcollection.cache.legacy;
 
 /**
  * A chain node as seen by the shared segment machinery ({@link HashSegment}).

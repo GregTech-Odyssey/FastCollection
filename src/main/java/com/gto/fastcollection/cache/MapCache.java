@@ -21,12 +21,14 @@ import java.util.function.UnaryOperator;
  * implementation whose {@code getCache} runs the function under a lock
  * ({@link HashCache}).
  *
- * <p>An optional {@link UnaryOperator keyMappingFunction} remaps the key
- * before it is looked up or stored: the mapping decides <em>where</em> the
- * value lives, while the create function still receives the original key.
- * The identity mapping is the default (no remapping); other mappings can
- * canonicalize keys (intern by content) or redirect groups of keys to one
- * slot.
+ * <p>An optional {@link UnaryOperator keyMappingFunction} remaps the key before
+ * it is stored, and the mapped key is what the entry is filed under; the create
+ * function receives the mapped key. The mapping must preserve the key's hash and
+ * equality — it is a canonicalisation (an interned-by-content equivalent, a
+ * defensive copy, and so on), not a redirect: entries are probed under the
+ * original key's hash, so a mapping that changed the hash or the equality would
+ * file the value where no later lookup of the original key could find it. The
+ * identity mapping is the default (no remapping).
  *
  * <p>A create function returning {@code null} is not stored: the key is simply
  * left absent. Create functions must not assume they run exactly once per key —
@@ -51,11 +53,11 @@ public interface MapCache<K, V> {
     /**
      * Like {@link #getCache(Object, Function)}, but the value is looked up and
      * stored under the mapped key {@code keyMappingFunction.apply(k)}; the
-     * create function still receives the original {@code k}.
+     * create function receives the mapped key.
      *
-     * @param k                 the key to look up
-     * @param createFunction    computes the value when absent
-     * @param keyMappingFunction remaps {@code k} to the storage key
+     * @param k                  the key to look up
+     * @param createFunction     computes the value when absent
+     * @param keyMappingFunction remaps {@code k} to the storage key; it must preserve {@code k}'s hash and equality
      * @return the value now associated with {@code k}
      */
     V getCache(final K k, Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction);
@@ -75,12 +77,12 @@ public interface MapCache<K, V> {
     /**
      * Like {@link #getCacheRecursive(Object, Function)}, but the value is
      * looked up and stored under the mapped key
-     * {@code keyMappingFunction.apply(k)}; the create function still receives
-     * the original {@code k}.
+     * {@code keyMappingFunction.apply(k)}; the create function receives the
+     * mapped key.
      *
-     * @param k                 the key to look up
-     * @param createFunction    computes the value when absent
-     * @param keyMappingFunction remaps {@code k} to the storage key
+     * @param k                  the key to look up
+     * @param createFunction     computes the value when absent
+     * @param keyMappingFunction remaps {@code k} to the storage key; it must preserve {@code k}'s hash and equality
      * @return the value now associated with {@code k}
      */
     V getCacheRecursive(final K k, Function<? super K, ? extends V> createFunction, UnaryOperator<K> keyMappingFunction);

@@ -6,17 +6,18 @@
 
 - **枚举原始 map（`map.enums`）**：命中读比 JDK `EnumMap` 快 21%、比哈希实现快 **3~4 倍**；计数器 `addTo` 每次调用**零分配**、2 倍于装箱写法；每键仅摊销一个数组槽（int 版 4 B），内存下限。
 - **O2X 开放寻址容器（`fastutil`）**：探测三层短路（存储哈希 → 引用相等 → `equals`），同实例重复查询免 `equals`；equals 昂贵 + 大规模下 `containsKey` / `add` / `put` 领先 JDK **9~26%**；原始值版每条目 24 B，比装箱 `HashMap`（44 B）**省 45% 内存**。
-- **并发缓存与驻留器（`cache`）**：分段 `StampedLock` 读路径与 `ConcurrentHashMap` 同量级，写路径反超（111 vs 81 ops/µs）；弱引用清理写入路径顺手完成，稳态零开销。
+- **并发缓存与驻留器（`cache`）**：单表开放寻址，读路径**无锁**（`VarHandle` acquire 探测），写路径以 **CAS 抢占探测序列的首个空闲槽**（写者之间完全并行，只有扩容时取独占）；提供 CHM 没有的身份键、策略键与弱值语义，弱值经周期清扫（扫槽位，不依赖 `ReferenceQueue`）回收，稳态无额外开销。
 
 ## 包结构
 
 ### `cache` — 线程安全缓存与对象驻留
 
-- **`MapCache<K, V>`**：`putIfAbsent` 语义的并发缓存。`getCache` 的工厂函数在写锁内执行（每键恰好一次）；`getCacheRecursive` 的工厂函数在所有锁之外执行，允许递归回调本缓存解析依赖键。
-- **`Interner<T>`**：线程安全对象驻留器，相等对象收敛为同一规范实例。
+- **`MapCache<K, V>`**：`putIfAbsent` 语义的并发缓存。除 CHM 基线的 `HashCache`（`computeIfAbsent`：工厂每键恰好执行一次，且不允许同键递归回调）外，各实现的工厂函数都在**所有锁之外**执行——并发下同一键可能被多个线程各算一次，先写入者胜出——因此允许递归回调本缓存解析依赖键；`getCacheRecursive` 是该保证的显式名字。工厂返回 `null` 时不入表，键保持缺失。
+- **`Interner<T>`**：线程安全对象驻留器，相等对象收敛为同一规范实例（`HashInterner` 为 CHM 基线）。
 - 两个正交维度组合出全部实现：**键语义**（`equals` / 自定义 `Hash.Strategy` / 身份）× **值强度**（强 / 弱引用）。
-- 弱引用实现注册到全局 `CacheCleaner` 守护线程（10s 周期清扫死条目），写入路径同时顺手清理。
-- 分段结构（`StampedLock` 段 + 链地址表）的公共骨架提取在 `Segmented` / `HashSegment` / `ChainNode`：冷路径（resize、clear、清扫）共享，热路径（探测与写入循环）留在各实现内以避免多态派发开销。
+- 弱引用实现注册到全局 `CacheCleaner` 守护线程（10s 周期清扫）：清扫按实际活条目重建整表、丢掉 referent 已回收的节点，写入路径则直接复用已回收节点的槽位——没有 `ReferenceQueue` 记账。
+- 每张表是一段**无锁开放寻址**结构（`OpenCacheTable`）：`volatile Object[] slots`，`mask` 由数组长度派生；读路径以 `VarHandle` 的 acquire 语义探测、不加锁；写入把节点 **compare-and-set 到探测序列的第一个空闲槽**，CAS 的期望值是**本次探测观察到的槽值**，因此竞争者先占槽会让 CAS 失败并重探，任何冲突都不会丢写、也不会重复插入。没有墓碑、也没有删除路径（`MapCache` 不提供 remove）：弱值缓存里已回收节点的槽位由写者直接 CAS 覆盖复用，`sweep()` 在独占 stamp 下按实际活条目数重建整表（丢死条目、活条目放不下才扩容）；表始终保留至少一个从未使用的 `null` 槽，且所有探测都有 `mask` 步上限。扩容先填充新表、再经 volatile 字段发布，且与写者之间用一把 `StampedLock` 排序（写者持共享 stamp，因此彼此并行；只有扩容/清空取独占）写入顺序与 `ConcurrentHashMap` 一致：先在共享 stamp 下**完成插入**，再按装载因子决定是否扩容（只有探测找不到任何空闲槽时才先扩容），这与 `ConcurrentHashMap` 在 transfer 期间阻塞写者是同一个道理。`clearCache()`/`sweep()` 清扫死条目同样无锁。`size` 是近似计数，只用于装载因子；因此**读探测和写探测一样有 `mask` 步数上限**——即便计数少算（它们是普通字段的非原子自增，并发下会丢更新）导致表被节点填满，读也只会走满一圈后返回 miss，绝不死循环（存在的键一定在整圈内被找到，不会误报缺失），而写路径走满一圈则强制扩容自愈。
+- 构造函数只保留默认与 `createFunction` 重载：原来的 `concurrencyLevel` 参数**已随分段一并删除**（每张表只有一张表、没有分段可配，参数只会误导），因此这是**源码不兼容**变更；`HashCache` 作为 CHM 基线不变。
 
 ### `map` — 嵌套结构样板消除
 
@@ -37,7 +38,9 @@
 
 ## 性能
 
-以下为 2026-08-22 全量回归数据：JMH 吞吐（ops/µs），单 fork、3×1s 预热、5×1s 迭代，±99.9% 置信区间，10% 以内视为噪声。绝对值仅在同机同 JVM 下有可比性，相对结论跨机成立。复现：`./gradlew jmh -Pbenchmark="<类名>"`，加 `-Pprof=gc` 获得分配数据。
+以下为 JMH 吞吐（ops/µs），单 fork、3×1s 预热、5×1s 迭代，±99.9% 置信区间，10% 以内视为噪声。绝对值仅在同机同 JVM 下有可比性，相对结论跨机成立。复现：`./gradlew jmh -Pbenchmark="<类名>"`，加 `-Pprof=gc` 获得分配数据。
+
+> **环境说明**：`cache` 两张表（并发缓存、对象驻留器）是**单表 CAS 无锁开放寻址（v2）**重构后的实测（2026-09-20，JDK 25，单 fork、3×1s 预热、5×1s 迭代）；`map.enums` / `O2X` / 内存三节仍是 2026-08-22 的数据。同一轮里**未改动的 CHM 基线自身**也在波动（`intern` 128 键 101→103，而 `addIfAbsent` 128 键 86→56），说明本轮 JVM/机器状态与历史数据不同，**两张表内部可比、与其余小节不可直接比**。
 
 ### 枚举原始类型 map（`map.enums`）——特长：值全程零装箱
 
@@ -68,21 +71,22 @@
 
 ### 并发缓存（`cache`）
 
-`MapCache` 六实现（128 / 4096 键，ops/µs）：
+`MapCache` 六实现（128 / 4096 键，ops/µs；单表 CAS 核心的实测，见上方环境说明）：
 
 | 实现 | 读 `getIfPresent` 128 | 4096 | 命中 `getCache` 128 | 4096 | 写 `putIfAbsent` 128 | 4096 | 冷键 `getCache` 128 | 4096 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| HashCache（CHM 基线） | **175** | **103** | **106** | **74** | 81 | 59 | **138** | 60 |
-| IdentityHashCache | 84 | 65 | 83 | 63 | 97 | **68** | 82 | 55 |
-| CustomHashCache | 94 | 70 | 80 | 68 | **111** | 61 | 70 | 61 |
-| WeakValueHashCache | 88 | 65 | 68 | 61 | 101 | 54 | 73 | 59 |
-| WeakValueIdentityHashCache | 80 | 60 | 78 | 60 | 88 | 52 | 69 | 50 |
-| WeakValueCustomHashCache | 91 | 64 | 81 | 57 | 91 | 60 | 71 | 60 |
+| HashCache（CHM 基线） | **132** | **67** | 89 | 53 | **74** | **44** | **94** | 40 |
+| IdentityHashCache | 91 | 59 | 73 | 63 | 61 | 37 | 61 | 40 |
+| CustomHashCache | 72 | 64 | 74 | **69** | 50 | 32 | 56 | 37 |
+| WeakValueHashCache | 69 | 63 | 71 | 67 | 44 | 31 | 52 | 39 |
+| WeakValueIdentityHashCache | 88 | 54 | **98** | 59 | 52 | 29 | 55 | **42** |
+| WeakValueCustomHashCache | 68 | 60 | 73 | 64 | 43 | 33 | 56 | **42** |
 
-- 分段 `StampedLock` 实现的读路径与 `ConcurrentHashMap` 同量级（共享读锁、读间无竞争），同时提供 CHM 没有的身份键、策略键与弱值语义；
-- 写路径上自研分段实现反超 CHM（`CustomHashCache` 111 vs 81）：putIfAbsent 语义免装箱检查、段锁粒度更细；
-- 弱值版本相比同族强值版读路径仅低 3~9%（`get` 后多一次弱引用解引用）；
-- 4096 键时各实现收敛到 50~74（缓存效应主导，锁开销已不是瓶颈）。
+- 读路径**无锁**：`VarHandle` acquire 探测开放寻址槽位，与 `ConcurrentHashMap` 的读同量级，同时提供 CHM 没有的身份键、策略键与弱值语义；
+- 写路径把节点 compare-and-set 到探测序列的第一个空闲槽，期望值取本次探测观察到的槽值——冲突即重探，不丢写也不重复插入；写者之间完全并行，只有扩容/清空取独占 stamp（见包结构小节）；
+- 没有墓碑：死条目（弱值已回收，对象弱值/原始类型弱值/弱驻留器一致）的槽位一律被写者直接 CAS 覆盖复用，两个写者都把它当候选时输的一方重探即看到赢家的活节点，不会双插入；
+- 弱值由 `CacheCleaner` 周期清扫（扫槽位即可，不依赖 `ReferenceQueue`）回收，稳态不产生额外清扫开销；
+- 单表无分段后，4096 键的读路径明显受益：`CustomHashCache` 的 `getCache` 命中读 **69** 反超 CHM 基线 53，`IdentityHashCache` / `WeakValueHashCache` / `WeakValueCustomHashCache` 也都达到基线的 1.1~1.3 倍；128 键仍以 CHM 基线最优。
 
 ### 对象驻留器（`cache`）
 
@@ -90,12 +94,12 @@
 
 | 实现 | `intern` 命中 128 | 4096 | `isPresent` 128 | 4096 | `addIfAbsent` 128 | 4096 |
 |---|---:|---:|---:|---:|---:|---:|
-| HashInterner（CHM 基线） | **146** | **71** | **241** | **113** | **108** | 62 |
-| CustomHashInterner | 83 | 50 | 80 | 71 | 106 | **82** |
-| WeakHashInterner | 78 | 49 | 81 | 65 | 94 | 67 |
-| WeakCustomHashInterner | 53 | 40 | 81 | 65 | 93 | 68 |
+| HashInterner（CHM 基线） | **103** | 52 | **164** | **70** | 56 | 40 |
+| CustomHashInterner | 66 | 53 | 67 | 53 | **67** | **57** |
+| WeakHashInterner | 64 | **54** | 63 | 53 | 65 | 54 |
+| WeakCustomHashInterner | 60 | 52 | 66 | 61 | 62 | 56 |
 
-弱引用版本承担弱语义（死节点探测 + 写路径顺手清理），`isPresent` 与强引用版持平，`intern` 低 12~36%；稳态下不产生额外清扫开销。
+除 CHM 基线的 `HashInterner` 外，三个实现都与缓存共用同一套无锁开放寻址骨架（`OpenCacheTable`），单键路径不再经过分段与拉链：**4096 键时 `addIfAbsent` 反超 CHM 基线 37~45%**（57 / 54 / 56 vs 40），`intern` 与基线持平（101~104%），`isPresent` 为基线的 76~88%；128 键时 `addIfAbsent` 也高出 11~21%，而 `intern` / `isPresent` 分别为基线的 58~64% 与 38~41%（CHM 小表的读命中由 `Node` 数组直接寻址，仍是最快的）。弱引用版本承担弱语义（弱引用 + 清扫/复用死节点槽位），与同族强引用版的差距已在 5% 以内，只多一次弱引用解引用与队列注册；稳态下不产生额外清扫开销。
 
 ### O2X 开放寻址缓存容器（`fastutil` 包）
 
