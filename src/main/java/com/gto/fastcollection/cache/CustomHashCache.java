@@ -153,10 +153,6 @@ public final class CustomHashCache<K, V> extends Segmented<CustomHashCache.Segme
             return node.hash;
         }
 
-        @Override
-        protected boolean isDead(Node<K, V> node) {
-            return false;
-        }
 
         /**
          * Recursive variant: probes under the read lock, runs the function with

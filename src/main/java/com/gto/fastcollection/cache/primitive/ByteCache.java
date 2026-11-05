@@ -122,10 +122,6 @@ public final class ByteCache<V> extends Segmented<ByteCache.Segment<V>> {
             return node.key;
         }
 
-        @Override
-        protected boolean isDead(Node<V> node) {
-            return false;
-        }
 
         /**
          * Probes under the read lock, runs the function with every lock released

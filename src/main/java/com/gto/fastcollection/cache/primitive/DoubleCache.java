@@ -122,10 +122,6 @@ public final class DoubleCache<V> extends Segmented<DoubleCache.Segment<V>> {
             return Long.hashCode(Double.doubleToLongBits(node.key));
         }
 
-        @Override
-        protected boolean isDead(Node<V> node) {
-            return false;
-        }
 
         /**
          * Probes under the read lock, runs the function with every lock released

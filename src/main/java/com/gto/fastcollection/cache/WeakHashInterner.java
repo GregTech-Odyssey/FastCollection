@@ -19,8 +19,9 @@ import static it.unimi.dsi.fastutil.HashCommon.arraySize;
  *
  * <p>Because references are weak, a canonical instance may disappear between
  * calls once it is collected (and a later {@link #intern} of an equal object
- * will create a fresh one). Dead entries are pruned lazily on writes and by
- * {@link CacheCleaner} through {@link #clearCache()}.
+ * will create a fresh one). Dead entries are unlinked by {@link CacheDrainer}
+ * through a {@link java.lang.ref.ReferenceQueue} (or by an explicit
+ * {@link #clearCache()}), never by a table scan on the caller's thread.
  *
  * <p>Concurrency mirrors {@link CustomHashCache}: power-of-two segments, each
  * guarded by a {@link StampedLock}; reads take the shared read lock and writes
@@ -36,14 +37,14 @@ public final class WeakHashInterner<T> extends Segmented<WeakHashInterner.Segmen
     }
 
     /**
-     * Creates an interner with the given concurrency level; registers it with
-     * {@link CacheCleaner}.
+     * Creates an interner with the given concurrency level; it registers with
+     * {@link CacheDrainer} for background reclamation.
      *
      * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
      */
     public WeakHashInterner(int concurrencyLevel) {
         super(concurrencyLevel, i -> new Segment<>());
-        CacheCleaner.add(this);
+        CacheDrainer.add(this);
     }
 
     /**
@@ -96,14 +97,14 @@ public final class WeakHashInterner<T> extends Segmented<WeakHashInterner.Segmen
      */
     @Override
     public void clearCache() {
-        sweepSegments();
+        expungeStaleEntries();
     }
 
     /**
      * A striped segment holding canonical instances as {@link WeakReferenceNode}s
      * (weak referent, stored hash) on the shared {@link HashSegment} skeleton.
      * A node whose referent has been collected is dead: writers remove it in
-     * passing and the inherited sweep drops it in bulk; readers never mutate
+     * passing and the queue drain drops it in bulk; readers never mutate
      * the chain.
      */
     final static class Segment<T> extends HashSegment<WeakReferenceNode<T>> {
@@ -120,11 +121,6 @@ public final class WeakHashInterner<T> extends Segmented<WeakHashInterner.Segmen
         @Override
         protected int nodeHash(WeakReferenceNode<T> node) {
             return node.hash;
-        }
-
-        @Override
-        protected boolean isDead(WeakReferenceNode<T> node) {
-            return node.get() == null;
         }
 
         /**
@@ -169,7 +165,7 @@ public final class WeakHashInterner<T> extends Segmented<WeakHashInterner.Segmen
                     }
                     curr = curr.next;
                 }
-                table[index] = new WeakReferenceNode<>(v, hash, node);
+                table[index] = new WeakReferenceNode<>(v, hash, node, staleQueue());
                 if (++size > maxFill) {
                     resize();
                 }
@@ -230,7 +226,7 @@ public final class WeakHashInterner<T> extends Segmented<WeakHashInterner.Segmen
                     }
                     curr = curr.next;
                 }
-                table[index] = new WeakReferenceNode<>(k, hash, node);
+                table[index] = new WeakReferenceNode<>(k, hash, node, staleQueue());
                 if (++size > maxFill) {
                     resize();
                 }

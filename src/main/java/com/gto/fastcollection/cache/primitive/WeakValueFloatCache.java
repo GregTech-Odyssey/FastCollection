@@ -1,13 +1,14 @@
 package com.gto.fastcollection.cache.primitive;
 
 import com.gto.fastcollection.Concurrents;
-import com.gto.fastcollection.cache.CacheCleaner;
+import com.gto.fastcollection.cache.CacheDrainer;
 import com.gto.fastcollection.cache.ChainNode;
 import com.gto.fastcollection.cache.HashSegment;
 import com.gto.fastcollection.cache.ICleanableCache;
 import com.gto.fastcollection.cache.Segmented;
 import it.unimi.dsi.fastutil.HashCommon;
 
+import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import it.unimi.dsi.fastutil.floats.Float2ObjectFunction;
 
@@ -19,7 +20,7 @@ import it.unimi.dsi.fastutil.floats.Float2ObjectFunction;
  *
  * <p>Because values are weak, "present" and "absent" are time-dependent. Dead
  * entries are pruned eagerly on writes (a write to a collected key reuses the
- * node) and lazily by {@link CacheCleaner} through {@link #clearCache()}.
+ * node) and drained from a {@link java.lang.ref.ReferenceQueue} by {@link CacheDrainer}.
  *
  * <p>Concurrency mirrors the strong primitive caches: power-of-two segments,
  * each guarded by a {@link java.util.concurrent.locks.StampedLock}; the create
@@ -59,14 +60,14 @@ public final class WeakValueFloatCache<V> extends Segmented<WeakValueFloatCache.
 
     /**
      * Creates a cache with the given concurrency level and default create function;
-     * registers this cache with {@link CacheCleaner}.
+     * registers this cache with {@link CacheDrainer} for background reclamation.
      *
      * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
      */
     public WeakValueFloatCache(int concurrencyLevel, Float2ObjectFunction<? extends V> createFunction) {
         super(concurrencyLevel, i -> new Segment<>());
+        CacheDrainer.add(this);
         this.createFunction = createFunction;
-        CacheCleaner.add(this);
     }
 
     /**
@@ -117,7 +118,7 @@ public final class WeakValueFloatCache<V> extends Segmented<WeakValueFloatCache.
      */
     @Override
     public void clearCache() {
-        sweepSegments();
+        expungeStaleEntries();
     }
 
     /**
@@ -125,7 +126,7 @@ public final class WeakValueFloatCache<V> extends Segmented<WeakValueFloatCache.
      * {@link WeakReference} (weak value, strong primitive key) on the shared
      * {@link HashSegment} skeleton; nodes store no separate hash, so resizing
      * re-derives it. Dead nodes are replaced in place by writers and dropped in
-     * bulk by the inherited sweep; readers never mutate the chain.
+     * bulk by the queue drain; readers never mutate the chain.
      */
     static final class Segment<V> extends HashSegment<Node<V>> {
 
@@ -141,11 +142,6 @@ public final class WeakValueFloatCache<V> extends Segmented<WeakValueFloatCache.
         @Override
         protected int nodeHash(Node<V> node) {
             return Float.floatToIntBits(node.key);
-        }
-
-        @Override
-        protected boolean isDead(Node<V> node) {
-            return node.get() == null;
         }
 
         /**
@@ -184,7 +180,7 @@ public final class WeakValueFloatCache<V> extends Segmented<WeakValueFloatCache.
                             return existing;
                         }
                         // value was collected: replace the dead node with the computed value
-                        var n = new Node<>(k, v, curr.next);
+                        var n = new Node<>(k, v, curr.next, staleQueue());
                         if (prev == null) {
                             table[index] = n;
                         } else {
@@ -195,7 +191,7 @@ public final class WeakValueFloatCache<V> extends Segmented<WeakValueFloatCache.
                     prev = curr;
                     curr = curr.next;
                 }
-                table[index] = new Node<>(k, v, node);
+                table[index] = new Node<>(k, v, node, staleQueue());
                 if (++size > maxFill) {
                     resize();
                 }
@@ -239,7 +235,7 @@ public final class WeakValueFloatCache<V> extends Segmented<WeakValueFloatCache.
                         V old = curr.get();
                         if (old != null) return old;
                         // value was collected: replace the dead node with the new value
-                        var n = new Node<>(k, v, curr.next);
+                        var n = new Node<>(k, v, curr.next, staleQueue());
                         if (prev == null) {
                             table[index] = n;
                         } else {
@@ -250,7 +246,7 @@ public final class WeakValueFloatCache<V> extends Segmented<WeakValueFloatCache.
                     prev = curr;
                     curr = curr.next;
                 }
-                table[index] = new Node<>(k, v, node);
+                table[index] = new Node<>(k, v, node, staleQueue());
                 if (++size > maxFill) {
                     resize();
                 }
@@ -266,8 +262,8 @@ public final class WeakValueFloatCache<V> extends Segmented<WeakValueFloatCache.
         private final float key;
         private volatile Node<V> next;
 
-        private Node(float key, V value, Node<V> next) {
-            super(value);
+        private Node(float key, V value, Node<V> next, ReferenceQueue<Object> queue) {
+            super(value, queue);
             this.key = key;
             this.next = next;
         }

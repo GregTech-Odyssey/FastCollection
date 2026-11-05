@@ -122,10 +122,6 @@ public final class LongCache<V> extends Segmented<LongCache.Segment<V>> {
             return Long.hashCode(node.key);
         }
 
-        @Override
-        protected boolean isDead(Node<V> node) {
-            return false;
-        }
 
         /**
          * Probes under the read lock, runs the function with every lock released

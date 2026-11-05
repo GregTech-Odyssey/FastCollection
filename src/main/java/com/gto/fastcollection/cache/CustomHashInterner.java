@@ -103,10 +103,6 @@ public final class CustomHashInterner<T> extends Segmented<CustomHashInterner.Se
             return node.hash;
         }
 
-        @Override
-        protected boolean isDead(Node<T> node) {
-            return false;
-        }
 
         /**
          * Lookup under the read lock; on a miss the canonical instance is stored under the write lock.

@@ -4,6 +4,7 @@ import com.gto.fastcollection.Concurrents;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 
+import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.util.Arrays;
 import java.util.concurrent.locks.StampedLock;
@@ -19,7 +20,9 @@ import static it.unimi.dsi.fastutil.HashCommon.arraySize;
  * by {@link java.lang.ref.WeakReference}. Use it to attach short-lived data to
  * object instances without keeping either the key or the value alive.
  *
- * <p>Registered with {@link CacheCleaner} for periodic dead-entry sweeping.
+ * <p>Collected entries are unlinked by the shared {@link CacheDrainer} daemon
+ * thread through a per-segment {@link java.lang.ref.ReferenceQueue}: the drain
+ * is {@code O(collected)} and never runs on a cache caller's thread.
  */
 public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueIdentityHashCache.Segment<K, V>> implements MapCache<K, V>, ICleanableCache {
 
@@ -52,14 +55,14 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
 
     /**
      * Creates a cache with the given concurrency level and default create function;
-     * registers this cache with {@link CacheCleaner}.
+     * registers this cache with {@link CacheDrainer} for background reclamation.
      *
      * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
      */
     public WeakValueIdentityHashCache(int concurrencyLevel, Function<? super K, ? extends V> createFunction) {
         super(concurrencyLevel, i -> new Segment<>());
+        CacheDrainer.add(this);
         this.createFunction = createFunction;
-        CacheCleaner.add(this);
     }
 
     @Override
@@ -128,7 +131,7 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
      */
     @Override
     public void clearCache() {
-        sweepSegments();
+        expungeStaleEntries();
     }
 
     /**
@@ -136,7 +139,7 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
      * {@link WeakReference} (weak value, strong key, identity-compared) on the
      * shared {@link HashSegment} skeleton; nodes store no hash, so resizing
      * re-derives it. Dead nodes are replaced in place by writers and dropped in
-     * bulk by the inherited sweep; readers never mutate the chain.
+     * bulk by the queue drain; readers never mutate the chain.
      */
     final static class Segment<K, V> extends HashSegment<Node<K, V>> {
 
@@ -152,11 +155,6 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
         @Override
         protected int nodeHash(Node<K, V> node) {
             return System.identityHashCode(node.key);
-        }
-
-        @Override
-        protected boolean isDead(Node<K, V> node) {
-            return node.get() == null;
         }
 
         /**
@@ -197,7 +195,7 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
                             return existing;
                         }
                         // value was collected: replace the dead node with the computed value
-                        var n = new Node<>(mapped, v, curr.next);
+                        var n = new Node<>(mapped, v, curr.next, staleQueue());
                         if (prev == null) {
                             table[index] = n;
                         } else {
@@ -208,7 +206,7 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
                     prev = curr;
                     curr = curr.next;
                 }
-                table[index] = new Node<>(mapped, v, node);
+                table[index] = new Node<>(mapped, v, node, staleQueue());
                 if (++size > maxFill) {
                     resize();
                 }
@@ -253,7 +251,7 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
                         V old = curr.get();
                         if (old != null) return old;
                         // value was collected: replace the dead node with the new value
-                        var n = new Node<>(k, v, curr.next);
+                        var n = new Node<>(k, v, curr.next, staleQueue());
                         if (prev == null) {
                             table[index] = n;
                         } else {
@@ -264,7 +262,7 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
                     prev = curr;
                     curr = curr.next;
                 }
-                table[index] = new Node<>(k, v, node);
+                table[index] = new Node<>(k, v, node, staleQueue());
                 if (++size > maxFill) {
                     resize();
                 }
@@ -280,8 +278,8 @@ public final class WeakValueIdentityHashCache<K, V> extends Segmented<WeakValueI
         private final K key;
         private volatile Node<K, V> next;
 
-        private Node(K key, V value, Node<K, V> next) {
-            super(value);
+        private Node(K key, V value, Node<K, V> next, ReferenceQueue<Object> queue) {
+            super(value, queue);
             this.key = key;
             this.next = next;
         }

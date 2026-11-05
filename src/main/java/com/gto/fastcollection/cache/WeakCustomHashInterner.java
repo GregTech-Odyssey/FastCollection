@@ -16,7 +16,9 @@ import static it.unimi.dsi.fastutil.HashCommon.arraySize;
  * equality (see {@link CustomHashInterner}). Use it when canonical instances
  * should be dropped once unused, and "equal" is decided by application logic.
  *
- * <p>Registered with {@link CacheCleaner} for periodic dead-entry sweeping.
+ * <p>Collected entries are unlinked by the shared {@link CacheDrainer} daemon
+ * thread through a per-segment {@link java.lang.ref.ReferenceQueue}: the drain
+ * is {@code O(collected)} and never runs on a cache caller's thread.
  */
 public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInterner.Segment<T>> implements Interner<T>, ICleanableCache {
 
@@ -30,15 +32,15 @@ public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInt
     }
 
     /**
-     * Creates an interner with the given concurrency level; registers it with
-     * {@link CacheCleaner}.
+     * Creates an interner with the given concurrency level; it registers with
+     * {@link CacheDrainer} for background reclamation.
      *
      * @throws IllegalArgumentException if {@code concurrencyLevel} is not positive
      */
     public WeakCustomHashInterner(int concurrencyLevel, Hash.Strategy<? super T> strategy) {
         super(concurrencyLevel, i -> new Segment<>(strategy));
+        CacheDrainer.add(this);
         this.strategy = strategy;
-        CacheCleaner.add(this);
     }
 
     /**
@@ -91,14 +93,14 @@ public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInt
      */
     @Override
     public void clearCache() {
-        sweepSegments();
+        expungeStaleEntries();
     }
 
     /**
      * A striped segment holding canonical instances as {@link WeakReferenceNode}s
      * (weak referent, stored hash, strategy-compared) on the shared
      * {@link HashSegment} skeleton. Dead nodes are removed in passing by
-     * writers and dropped in bulk by the inherited sweep; readers never mutate
+     * writers and dropped in bulk by the queue drain; readers never mutate
      * the chain.
      */
     final static class Segment<T> extends HashSegment<WeakReferenceNode<T>> {
@@ -117,11 +119,6 @@ public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInt
         @Override
         protected int nodeHash(WeakReferenceNode<T> node) {
             return node.hash;
-        }
-
-        @Override
-        protected boolean isDead(WeakReferenceNode<T> node) {
-            return node.get() == null;
         }
 
         /**
@@ -166,7 +163,7 @@ public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInt
                     }
                     curr = curr.next;
                 }
-                table[index] = new WeakReferenceNode<>(v, hash, node);
+                table[index] = new WeakReferenceNode<>(v, hash, node, staleQueue());
                 if (++size > maxFill) {
                     resize();
                 }
@@ -227,7 +224,7 @@ public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInt
                     }
                     curr = curr.next;
                 }
-                table[index] = new WeakReferenceNode<>(k, hash, node);
+                table[index] = new WeakReferenceNode<>(k, hash, node, staleQueue());
                 if (++size > maxFill) {
                     resize();
                 }

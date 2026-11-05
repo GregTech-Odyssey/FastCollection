@@ -145,10 +145,6 @@ public final class IdentityHashCache<K, V> extends Segmented<IdentityHashCache.S
             return System.identityHashCode(node.key);
         }
 
-        @Override
-        protected boolean isDead(Node<K, V> node) {
-            return false;
-        }
 
         /**
          * Recursive variant: probes under the read lock, runs the function with
