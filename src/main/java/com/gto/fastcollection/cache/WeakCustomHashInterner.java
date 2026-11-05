@@ -4,11 +4,7 @@ import com.gto.fastcollection.Concurrents;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 
-import java.util.Arrays;
-import java.util.concurrent.locks.StampedLock;
 import java.util.function.UnaryOperator;
-
-import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 
 /**
  * An {@link Interner} combining weak canonical instances (see
@@ -20,7 +16,7 @@ import static it.unimi.dsi.fastutil.HashCommon.arraySize;
  * thread through a per-segment {@link java.lang.ref.ReferenceQueue}: the drain
  * is {@code O(collected)} and never runs on a cache caller's thread.
  */
-public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInterner.Segment<T>> implements Interner<T>, ICleanableCache {
+public final class WeakCustomHashInterner<T> extends WeakSegmented<WeakCustomHashInterner.Segment<T>> implements Interner<T>, ICleanableCache {
 
     private final Hash.Strategy<? super T> strategy;
 
@@ -103,7 +99,7 @@ public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInt
      * writers and dropped in bulk by the queue drain; readers never mutate
      * the chain.
      */
-    final static class Segment<T> extends HashSegment<WeakReferenceNode<T>> {
+    final static class Segment<T> extends WeakHashSegment<WeakReferenceNode<T>> {
         private final Hash.Strategy<? super T> strategy;
 
         private Segment(Hash.Strategy<? super T> strategy) {
@@ -163,7 +159,7 @@ public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInt
                     }
                     curr = curr.next;
                 }
-                table[index] = new WeakReferenceNode<>(v, hash, node, staleQueue());
+                table[index] = new WeakReferenceNode<>(v, hash, node, queue);
                 if (++size > maxFill) {
                     resize();
                 }
@@ -224,7 +220,7 @@ public final class WeakCustomHashInterner<T> extends Segmented<WeakCustomHashInt
                     }
                     curr = curr.next;
                 }
-                table[index] = new WeakReferenceNode<>(k, hash, node, staleQueue());
+                table[index] = new WeakReferenceNode<>(k, hash, node, queue);
                 if (++size > maxFill) {
                     resize();
                 }

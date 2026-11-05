@@ -2,8 +2,6 @@ package com.gto.fastcollection.cache;
 
 import java.lang.ref.WeakReference;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Background reclaimer for the weak caches: a single daemon thread that walks
@@ -14,7 +12,7 @@ import java.util.concurrent.TimeUnit;
  * when nothing was collected: the segment peeks its {@link java.lang.ref.ReferenceQueue}
  * without taking any lock and returns, and only a segment that really has dead
  * nodes acquires its write lock (for a bounded batch, see
- * {@link HashSegment#BACKGROUND_BATCH}). The cost of a pass is therefore
+ * {@link WeakHashSegment#BACKGROUND_BATCH}). The cost of a pass is therefore
  * {@code O(collected)} where the old one was {@code O(table capacity)} under an
  * exclusive lock.
  *
@@ -32,9 +30,9 @@ public final class CacheDrainer {
      * (plus one pass), which is invisible for caches and keeps the idle cost at
      * "one queue peek per segment per interval".
      */
-    private static final long INTERVAL_MS = 20L;
+    private static final long INTERVAL_MS = 500L;
 
-    private static final ConcurrentLinkedDeque<WeakReference<Segmented<?>>> CACHES = new ConcurrentLinkedDeque<>();
+    private static final ConcurrentLinkedDeque<WeakReference<WeakSegmented<?>>> CACHES = new ConcurrentLinkedDeque<>();
 
     static {
         Thread thread = new Thread(() -> {
@@ -56,14 +54,14 @@ public final class CacheDrainer {
      * Registers a cache for background reclamation. Safe from any thread;
      * duplicate registrations are allowed (draining is idempotent).
      */
-    public static void add(Segmented<?> cache) {
+    public static void add(WeakSegmented<?> cache) {
         CACHES.offerLast(new WeakReference<>(cache));
     }
 
     private static void sweep() {
         var it = CACHES.iterator();
         while (it.hasNext()) {
-            Segmented<?> cache = it.next().get();
+            WeakSegmented<?> cache = it.next().get();
             if (cache == null) {
                 it.remove();
             } else {

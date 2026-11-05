@@ -4,12 +4,8 @@ import com.gto.fastcollection.Concurrents;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 
-import java.util.Arrays;
-import java.util.concurrent.locks.StampedLock;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
-
-import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 
 /**
  * A {@link MapCache} combining weak values (see {@link WeakValueHashCache}) with
@@ -21,7 +17,7 @@ import static it.unimi.dsi.fastutil.HashCommon.arraySize;
  * thread through a per-segment {@link java.lang.ref.ReferenceQueue}: the drain
  * is {@code O(collected)} and never runs on a cache caller's thread.
  */
-public final class WeakValueCustomHashCache<K, V> extends Segmented<WeakValueCustomHashCache.Segment<K, V>> implements MapCache<K, V>, ICleanableCache {
+public final class WeakValueCustomHashCache<K, V> extends WeakSegmented<WeakValueCustomHashCache.Segment<K, V>> implements MapCache<K, V>, ICleanableCache {
 
     private final Hash.Strategy<? super K> strategy;
     private final Function<? super K, ? extends V> createFunction;
@@ -140,7 +136,7 @@ public final class WeakValueCustomHashCache<K, V> extends Segmented<WeakValueCus
      * skeleton. Dead nodes are replaced in place by writers and dropped in bulk
      * by the queue drain; readers never mutate the chain.
      */
-    final static class Segment<K, V> extends HashSegment<WeakReferenceValueNode<K, V>> {
+    final static class Segment<K, V> extends WeakHashSegment<WeakReferenceValueNode<K, V>> {
         private final Hash.Strategy<? super K> strategy;
 
         private Segment(Hash.Strategy<? super K> strategy) {
@@ -197,7 +193,7 @@ public final class WeakValueCustomHashCache<K, V> extends Segmented<WeakValueCus
                             return existing;
                         }
                         // value was collected: replace the dead node with the computed value
-                        var n = new WeakReferenceValueNode<>(mapped, v, hash, curr.next, staleQueue());
+                        var n = new WeakReferenceValueNode<>(mapped, v, hash, curr.next, queue);
                         if (prev == null) {
                             table[index] = n;
                         } else {
@@ -208,7 +204,7 @@ public final class WeakValueCustomHashCache<K, V> extends Segmented<WeakValueCus
                     prev = curr;
                     curr = curr.next;
                 }
-                table[index] = new WeakReferenceValueNode<>(mapped, v, hash, node, staleQueue());
+                table[index] = new WeakReferenceValueNode<>(mapped, v, hash, node, queue);
                 if (++size > maxFill) {
                     resize();
                 }
@@ -253,7 +249,7 @@ public final class WeakValueCustomHashCache<K, V> extends Segmented<WeakValueCus
                         V old = curr.get();
                         if (old != null) return old;
                         // value was collected: replace the dead node with the new value
-                        var n = new WeakReferenceValueNode<>(k, v, hash, curr.next, staleQueue());
+                        var n = new WeakReferenceValueNode<>(k, v, hash, curr.next, queue);
                         if (prev == null) {
                             table[index] = n;
                         } else {
@@ -264,7 +260,7 @@ public final class WeakValueCustomHashCache<K, V> extends Segmented<WeakValueCus
                     prev = curr;
                     curr = curr.next;
                 }
-                table[index] = new WeakReferenceValueNode<>(k, v, hash, node, staleQueue());
+                table[index] = new WeakReferenceValueNode<>(k, v, hash, node, queue);
                 if (++size > maxFill) {
                     resize();
                 }

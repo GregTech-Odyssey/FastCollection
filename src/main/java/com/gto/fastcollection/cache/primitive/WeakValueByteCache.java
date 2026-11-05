@@ -1,16 +1,12 @@
 package com.gto.fastcollection.cache.primitive;
 
 import com.gto.fastcollection.Concurrents;
-import com.gto.fastcollection.cache.CacheDrainer;
-import com.gto.fastcollection.cache.ChainNode;
-import com.gto.fastcollection.cache.HashSegment;
-import com.gto.fastcollection.cache.ICleanableCache;
-import com.gto.fastcollection.cache.Segmented;
+import com.gto.fastcollection.cache.*;
 import it.unimi.dsi.fastutil.HashCommon;
+import it.unimi.dsi.fastutil.bytes.Byte2ObjectFunction;
 
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
-import it.unimi.dsi.fastutil.bytes.Byte2ObjectFunction;
 
 /**
  * A segmented concurrent cache from primitive {@code byte} keys to weak
@@ -29,7 +25,7 @@ import it.unimi.dsi.fastutil.bytes.Byte2ObjectFunction;
  * @param <V> the value type
  * @see ByteCache
  */
-public final class WeakValueByteCache<V> extends Segmented<WeakValueByteCache.Segment<V>> implements ICleanableCache {
+public final class WeakValueByteCache<V> extends WeakSegmented<WeakValueByteCache.Segment<V>> implements ICleanableCache {
 
     private final Byte2ObjectFunction<? extends V> createFunction;
 
@@ -128,7 +124,7 @@ public final class WeakValueByteCache<V> extends Segmented<WeakValueByteCache.Se
      * re-derives it. Dead nodes are replaced in place by writers and dropped in
      * bulk by the queue drain; readers never mutate the chain.
      */
-    static final class Segment<V> extends HashSegment<Node<V>> {
+    static final class Segment<V> extends WeakHashSegment<Node<V>> {
 
         private Segment() {
         }
@@ -180,7 +176,7 @@ public final class WeakValueByteCache<V> extends Segmented<WeakValueByteCache.Se
                             return existing;
                         }
                         // value was collected: replace the dead node with the computed value
-                        var n = new Node<>(k, v, curr.next, staleQueue());
+                        var n = new Node<>(k, v, curr.next, queue);
                         if (prev == null) {
                             table[index] = n;
                         } else {
@@ -191,7 +187,7 @@ public final class WeakValueByteCache<V> extends Segmented<WeakValueByteCache.Se
                     prev = curr;
                     curr = curr.next;
                 }
-                table[index] = new Node<>(k, v, node, staleQueue());
+                table[index] = new Node<>(k, v, node, queue);
                 if (++size > maxFill) {
                     resize();
                 }
@@ -235,7 +231,7 @@ public final class WeakValueByteCache<V> extends Segmented<WeakValueByteCache.Se
                         V old = curr.get();
                         if (old != null) return old;
                         // value was collected: replace the dead node with the new value
-                        var n = new Node<>(k, v, curr.next, staleQueue());
+                        var n = new Node<>(k, v, curr.next, queue);
                         if (prev == null) {
                             table[index] = n;
                         } else {
@@ -246,7 +242,7 @@ public final class WeakValueByteCache<V> extends Segmented<WeakValueByteCache.Se
                     prev = curr;
                     curr = curr.next;
                 }
-                table[index] = new Node<>(k, v, node, staleQueue());
+                table[index] = new Node<>(k, v, node, queue);
                 if (++size > maxFill) {
                     resize();
                 }

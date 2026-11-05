@@ -1,7 +1,6 @@
 package com.gto.fastcollection.cache;
 
 import com.gto.fastcollection.Concurrents;
-import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 
 import java.util.function.Function;
@@ -23,7 +22,7 @@ import java.util.function.UnaryOperator;
  * guarded by a {@link StampedLock}; reads take the shared read lock and writes
  * the exclusive write lock.
  */
-public final class WeakValueHashCache<K, V> extends Segmented<WeakValueHashCache.Segment<K, V>> implements MapCache<K, V>, ICleanableCache {
+public final class WeakValueHashCache<K, V> extends WeakSegmented<WeakValueHashCache.Segment<K, V>> implements MapCache<K, V>, ICleanableCache {
 
     private final Function<? super K, ? extends V> createFunction;
 
@@ -132,7 +131,7 @@ public final class WeakValueHashCache<K, V> extends Segmented<WeakValueHashCache
      * they hit it, and the queue drain drops it in bulk. Readers never
      * mutate the chain, so the shared read lock stays a pure read.
      */
-    final static class Segment<K, V> extends HashSegment<WeakReferenceValueNode<K, V>> {
+    final static class Segment<K, V> extends WeakHashSegment<WeakReferenceValueNode<K, V>> {
 
         private Segment() {
         }
@@ -187,7 +186,7 @@ public final class WeakValueHashCache<K, V> extends Segmented<WeakValueHashCache
                             return existing;
                         }
                         // value was collected: replace the dead node with the computed value
-                        var n = new WeakReferenceValueNode<>(mapped, v, hash, curr.next, staleQueue());
+                        var n = new WeakReferenceValueNode<>(mapped, v, hash, curr.next, queue);
                         if (prev == null) {
                             table[index] = n;
                         } else {
@@ -198,7 +197,7 @@ public final class WeakValueHashCache<K, V> extends Segmented<WeakValueHashCache
                     prev = curr;
                     curr = curr.next;
                 }
-                table[index] = new WeakReferenceValueNode<>(mapped, v, hash, node, staleQueue());
+                table[index] = new WeakReferenceValueNode<>(mapped, v, hash, node, queue);
                 if (++size > maxFill) {
                     resize();
                 }
@@ -243,7 +242,7 @@ public final class WeakValueHashCache<K, V> extends Segmented<WeakValueHashCache
                         V old = curr.get();
                         if (old != null) return old;
                         // value was collected: replace the dead node with the new value
-                        var n = new WeakReferenceValueNode<>(k, v, hash, curr.next, staleQueue());
+                        var n = new WeakReferenceValueNode<>(k, v, hash, curr.next, queue);
                         if (prev == null) {
                             table[index] = n;
                         } else {
@@ -254,7 +253,7 @@ public final class WeakValueHashCache<K, V> extends Segmented<WeakValueHashCache
                     prev = curr;
                     curr = curr.next;
                 }
-                table[index] = new WeakReferenceValueNode<>(k, v, hash, node, staleQueue());
+                table[index] = new WeakReferenceValueNode<>(k, v, hash, node, queue);
                 if (++size > maxFill) {
                     resize();
                 }

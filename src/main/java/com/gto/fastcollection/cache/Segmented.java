@@ -12,7 +12,7 @@ import java.util.function.IntFunction;
  */
 public abstract class Segmented<SEG extends HashSegment<?>> {
 
-    private final SEG[] segments;
+    protected final SEG[] segments;
     private final int segmentShift;
     private final int segmentMask;
 
@@ -51,34 +51,12 @@ public abstract class Segmented<SEG extends HashSegment<?>> {
     }
 
     /**
-     * Reclaims every segment's collected entries, one segment write lock at a
-     * time. This is what {@code clearCache()} exposes to callers; the background
-     * {@link CacheDrainer} uses the incremental {@link #drainCollected()} instead.
-     */
-    protected final void expungeStaleEntries() {
-        for (var segment : segments) {
-            segment.expungeAll();
-        }
-    }
-
-    /**
-     * One incremental reclamation pass for the background drainer: each segment
-     * unlinks a bounded batch of collected nodes, and an idle segment costs a
-     * queue peek without locking.
-     */
-    final void drainCollected() {
-        for (var segment : segments) {
-            segment.expunge();
-        }
-    }
-
-    /**
      * The number of entries currently held. Collected entries that have not
      * been reclaimed yet are still counted, so the result can transiently
      * over-report — the same contract as {@link java.util.WeakHashMap#size()}.
      * The read is lock-free and therefore an approximation under concurrency.
      */
-    public int size() {
+    public final int size() {
         int total = 0;
         for (var segment : segments) {
             total += segment.size;

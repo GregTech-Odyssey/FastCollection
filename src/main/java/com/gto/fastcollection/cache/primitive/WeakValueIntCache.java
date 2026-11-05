@@ -1,11 +1,7 @@
 package com.gto.fastcollection.cache.primitive;
 
 import com.gto.fastcollection.Concurrents;
-import com.gto.fastcollection.cache.CacheDrainer;
-import com.gto.fastcollection.cache.ChainNode;
-import com.gto.fastcollection.cache.HashSegment;
-import com.gto.fastcollection.cache.ICleanableCache;
-import com.gto.fastcollection.cache.Segmented;
+import com.gto.fastcollection.cache.*;
 import it.unimi.dsi.fastutil.HashCommon;
 
 import java.lang.ref.ReferenceQueue;
@@ -29,7 +25,7 @@ import java.util.function.IntFunction;
  * @param <V> the value type
  * @see IntCache
  */
-public final class WeakValueIntCache<V> extends Segmented<WeakValueIntCache.Segment<V>> implements ICleanableCache {
+public final class WeakValueIntCache<V> extends WeakSegmented<WeakValueIntCache.Segment<V>> implements ICleanableCache {
 
     private final IntFunction<? extends V> createFunction;
 
@@ -128,7 +124,7 @@ public final class WeakValueIntCache<V> extends Segmented<WeakValueIntCache.Segm
      * re-derives it. Dead nodes are replaced in place by writers and dropped in
      * bulk by the queue drain; readers never mutate the chain.
      */
-    static final class Segment<V> extends HashSegment<Node<V>> {
+    static final class Segment<V> extends WeakHashSegment<Node<V>> {
 
         private Segment() {
         }
@@ -180,7 +176,7 @@ public final class WeakValueIntCache<V> extends Segmented<WeakValueIntCache.Segm
                             return existing;
                         }
                         // value was collected: replace the dead node with the computed value
-                        var n = new Node<>(k, v, curr.next, staleQueue());
+                        var n = new Node<>(k, v, curr.next, queue);
                         if (prev == null) {
                             table[index] = n;
                         } else {
@@ -191,7 +187,7 @@ public final class WeakValueIntCache<V> extends Segmented<WeakValueIntCache.Segm
                     prev = curr;
                     curr = curr.next;
                 }
-                table[index] = new Node<>(k, v, node, staleQueue());
+                table[index] = new Node<>(k, v, node, queue);
                 if (++size > maxFill) {
                     resize();
                 }
@@ -235,7 +231,7 @@ public final class WeakValueIntCache<V> extends Segmented<WeakValueIntCache.Segm
                         V old = curr.get();
                         if (old != null) return old;
                         // value was collected: replace the dead node with the new value
-                        var n = new Node<>(k, v, curr.next, staleQueue());
+                        var n = new Node<>(k, v, curr.next, queue);
                         if (prev == null) {
                             table[index] = n;
                         } else {
@@ -246,7 +242,7 @@ public final class WeakValueIntCache<V> extends Segmented<WeakValueIntCache.Segm
                     prev = curr;
                     curr = curr.next;
                 }
-                table[index] = new Node<>(k, v, node, staleQueue());
+                table[index] = new Node<>(k, v, node, queue);
                 if (++size > maxFill) {
                     resize();
                 }

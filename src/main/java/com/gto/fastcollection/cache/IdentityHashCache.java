@@ -1,15 +1,11 @@
 package com.gto.fastcollection.cache;
 
 import com.gto.fastcollection.Concurrents;
-import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 
-import java.util.Arrays;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
-
-import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 
 /**
  * A {@link MapCache} with identity-based keys: keys are hashed with

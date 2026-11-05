@@ -4,11 +4,8 @@ import com.gto.fastcollection.Concurrents;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 
-import java.util.Arrays;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.UnaryOperator;
-
-import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 
 /**
  * An {@link Interner} with the same segmented, {@link StampedLock}-guarded
