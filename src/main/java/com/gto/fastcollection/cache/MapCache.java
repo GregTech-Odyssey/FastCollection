@@ -53,8 +53,8 @@ public interface MapCache<K, V> {
      * stored under the mapped key {@code keyMappingFunction.apply(k)}; the
      * create function still receives the original {@code k}.
      *
-     * @param k                 the key to look up
-     * @param createFunction    computes the value when absent
+     * @param k                  the key to look up
+     * @param createFunction     computes the value when absent
      * @param keyMappingFunction remaps {@code k} to the storage key
      * @return the value now associated with {@code k}
      */
@@ -78,8 +78,8 @@ public interface MapCache<K, V> {
      * {@code keyMappingFunction.apply(k)}; the create function still receives
      * the original {@code k}.
      *
-     * @param k                 the key to look up
-     * @param createFunction    computes the value when absent
+     * @param k                  the key to look up
+     * @param createFunction     computes the value when absent
      * @param keyMappingFunction remaps {@code k} to the storage key
      * @return the value now associated with {@code k}
      */

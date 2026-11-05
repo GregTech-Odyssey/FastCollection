@@ -12,10 +12,10 @@ import static it.unimi.dsi.fastutil.HashCommon.arraySize;
  * The shared skeleton of the striped segments: an independently locked hash
  * table with separate chaining, extending {@link StampedLock} so lock calls
  * are direct. It owns the table state and the cold-path operations (resize,
- * clear, dead-entry sweep); concrete subclasses keep their hot lookup and
- * write loops and only supply how to read a node's hash and whether it is
- * dead. Only the segment's own table is touched while its lock is held; other
- * segments proceed in parallel.
+ * clear, dead-entry reclamation); concrete subclasses keep their hot lookup and
+ * write loops and only supply how to read a node's hash and how to create the
+ * node array. Only the segment's own table is touched while its lock is held;
+ * other segments proceed in parallel.
  *
  * <p>{@code table}/{@code mask} are volatile because a resize swaps them;
  * {@code size}/{@code maxFill} are only mutated under the write lock and read
@@ -41,11 +41,6 @@ public abstract class HashSegment<N extends ChainNode<N>> extends StampedLock {
      * The stable hash a node was stored under.
      */
     protected abstract int nodeHash(N node);
-
-    /**
-     * Whether the node's referent has been collected; always false for strong nodes.
-     */
-    protected abstract boolean isDead(N node);
 
     /**
      * Creates a table of the concrete node type; subclasses must return an
@@ -107,42 +102,15 @@ public abstract class HashSegment<N extends ChainNode<N>> extends StampedLock {
     }
 
     /**
-     * Empties the table under the write lock.
+     * Empties the table under the write lock; nodes still sitting in the queue
+     * are dropped along with it.
      */
-    protected final void clear() {
+    protected void clear() {
         long stamp = writeLock();
         try {
-            if (size == 0) return;
-            size = 0;
-            Arrays.fill(table, null);
-        } finally {
-            unlockWrite(stamp);
-        }
-    }
-
-    /**
-     * Sweeps every dead node under the write lock; readers never mutate the chain.
-     */
-    protected final void clearInvalid() {
-        long stamp = writeLock();
-        try {
-            for (int i = 0; i < table.length; i++) {
-                N prev = null;
-                N curr = table[i];
-                while (curr != null) {
-                    if (isDead(curr)) {
-                        if (prev == null) {
-                            table[i] = curr.getNext();
-                        } else {
-                            prev.setNext(curr.getNext());
-                        }
-                        size--;
-                        curr = curr.getNext();
-                    } else {
-                        prev = curr;
-                        curr = curr.getNext();
-                    }
-                }
+            if (size != 0) {
+                size = 0;
+                Arrays.fill(table, null);
             }
         } finally {
             unlockWrite(stamp);

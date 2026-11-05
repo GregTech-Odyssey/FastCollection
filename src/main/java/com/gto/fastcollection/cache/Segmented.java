@@ -12,7 +12,7 @@ import java.util.function.IntFunction;
  */
 public abstract class Segmented<SEG extends HashSegment<?>> {
 
-    private final SEG[] segments;
+    protected final SEG[] segments;
     private final int segmentShift;
     private final int segmentMask;
 
@@ -51,11 +51,16 @@ public abstract class Segmented<SEG extends HashSegment<?>> {
     }
 
     /**
-     * Sweeps dead entries in every segment.
+     * The number of entries currently held. Collected entries that have not
+     * been reclaimed yet are still counted, so the result can transiently
+     * over-report — the same contract as {@link java.util.WeakHashMap#size()}.
+     * The read is lock-free and therefore an approximation under concurrency.
      */
-    protected final void sweepSegments() {
+    public final int size() {
+        int total = 0;
         for (var segment : segments) {
-            segment.clearInvalid();
+            total += segment.size;
         }
+        return total;
     }
 }

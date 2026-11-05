@@ -1,15 +1,11 @@
 package com.gto.fastcollection.cache;
 
 import com.gto.fastcollection.Concurrents;
-import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 
-import java.util.Arrays;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
-
-import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 
 /**
  * A {@link MapCache} with identity-based keys: keys are hashed with
@@ -145,10 +141,6 @@ public final class IdentityHashCache<K, V> extends Segmented<IdentityHashCache.S
             return System.identityHashCode(node.key);
         }
 
-        @Override
-        protected boolean isDead(Node<K, V> node) {
-            return false;
-        }
 
         /**
          * Recursive variant: probes under the read lock, runs the function with

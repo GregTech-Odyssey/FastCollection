@@ -6,7 +6,7 @@
 
 - **枚举原始 map（`map.enums`）**：命中读比 JDK `EnumMap` 快 21%、比哈希实现快 **3~4 倍**；计数器 `addTo` 每次调用**零分配**、2 倍于装箱写法；每键仅摊销一个数组槽（int 版 4 B），内存下限。
 - **O2X 开放寻址容器（`fastutil`）**：探测三层短路（存储哈希 → 引用相等 → `equals`），同实例重复查询免 `equals`；equals 昂贵 + 大规模下 `containsKey` / `add` / `put` 领先 JDK **9~26%**；原始值版每条目 24 B，比装箱 `HashMap`（44 B）**省 45% 内存**。
-- **并发缓存与驻留器（`cache`）**：分段 `StampedLock` 读路径与 `ConcurrentHashMap` 同量级，写路径反超（111 vs 81 ops/µs）；弱引用清理写入路径顺手完成，稳态零开销。
+- **并发缓存与驻留器（`cache`）**：分段 `StampedLock` 读路径与 `ConcurrentHashMap` 同量级，写路径反超（111 vs 81 ops/µs）；弱引用清理由后台 drainer 线程按 `ReferenceQueue` 增量回收，成本只与「本次被回收的条目数」成正比、写路径零开销。
 
 ## 包结构
 
@@ -15,7 +15,7 @@
 - **`MapCache<K, V>`**：`putIfAbsent` 语义的并发缓存。`getCache` 的工厂函数在写锁内执行（每键恰好一次）；`getCacheRecursive` 的工厂函数在所有锁之外执行，允许递归回调本缓存解析依赖键。
 - **`Interner<T>`**：线程安全对象驻留器，相等对象收敛为同一规范实例。
 - 两个正交维度组合出全部实现：**键语义**（`equals` / 自定义 `Hash.Strategy` / 身份）× **值强度**（强 / 弱引用）。
-- 弱引用实现注册到全局 `CacheCleaner` 守护线程（10s 周期清扫死条目），写入路径同时顺手清理。
+- 弱引用实现每个段一条 `ReferenceQueue`，GC 回收后入队，由单条守护线程 `CacheDrainer` 增量摘链：**空闲段只 poll 一次、不取锁**，有垃圾的段才拿写锁且每次最多处理 2048 个，成本 O(回收数) —— 不扫表、阻塞写线程的时间可忽略；需要同步回收时调 `clearCache()` 全量 drain。
 - 分段结构（`StampedLock` 段 + 链地址表）的公共骨架提取在 `Segmented` / `HashSegment` / `ChainNode`：冷路径（resize、clear、清扫）共享，热路径（探测与写入循环）留在各实现内以避免多态派发开销。
 
 ### `map` — 嵌套结构样板消除

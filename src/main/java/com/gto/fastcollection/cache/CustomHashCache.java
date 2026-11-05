@@ -4,12 +4,9 @@ import com.gto.fastcollection.Concurrents;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 
-import java.util.Arrays;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
-
-import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 
 /**
  * A {@link MapCache} that buckets keys into segments and protects each segment
@@ -153,10 +150,6 @@ public final class CustomHashCache<K, V> extends Segmented<CustomHashCache.Segme
             return node.hash;
         }
 
-        @Override
-        protected boolean isDead(Node<K, V> node) {
-            return false;
-        }
 
         /**
          * Recursive variant: probes under the read lock, runs the function with

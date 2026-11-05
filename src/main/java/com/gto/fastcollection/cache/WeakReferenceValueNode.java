@@ -1,12 +1,13 @@
 package com.gto.fastcollection.cache;
 
+import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 
 /**
  * A chain node holding the value weakly and the key strongly (weak-value caches).
  * {@code hash} is the key's stored hash; {@code next} links the chain. A node
- * whose value has been collected is dead and removed by writers or
- * {@code clearInvalid}.
+ * whose value has been collected is dead: writers unlink it in passing and the
+ * segment's reference-queue drain removes it.
  */
 final class WeakReferenceValueNode<K, V> extends WeakReference<V> implements ChainNode<WeakReferenceValueNode<K, V>> {
 
@@ -14,8 +15,8 @@ final class WeakReferenceValueNode<K, V> extends WeakReference<V> implements Cha
     final int hash;
     volatile WeakReferenceValueNode<K, V> next;
 
-    WeakReferenceValueNode(K key, V value, int hash, WeakReferenceValueNode<K, V> next) {
-        super(value);
+    WeakReferenceValueNode(K key, V value, int hash, WeakReferenceValueNode<K, V> next, ReferenceQueue<Object> queue) {
+        super(value, queue);
         this.key = key;
         this.hash = hash;
         this.next = next;
